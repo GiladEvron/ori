@@ -793,18 +793,31 @@ function pick(sec,btn,v,correct){
     isDone[sec]=true;btn.classList.add('ok');lockMCQ('mc'+sec);
     boom(80);
     showFb('fb'+sec,'ok',WINS[rnd(0,WINS.length-1)],'+1 דקת מסך 📺');
-    document.getElementById('nx'+sec).style.display='none';
-    addScore(1);
-    incStreak();
-    addSecProgress(sec);
-    trackCorrect(sec);
-    // after 1.5 sec - go to random new section
-    setTimeout(()=>rotateRandom(sec),1500);
+    addScore(1);incStreak();addSecProgress(sec);trackCorrect(sec);
+    setTimeout(()=>nextQuestion(sec),1800);
   } else {
-    btn.classList.add('no');showFb('fb'+sec,'no','התשובה לא נכונה 💪','תתרכז ותנסה שוב!');
+    btn.classList.add('no');showFb('fb'+sec,'no','התשובה לא נכונה 💪','נסה שוב!');
     trackWrong(sec);
-    setTimeout(()=>{btn.classList.remove('no');document.getElementById('fb'+sec).className='fb';gen(sec);},2000);
+    setTimeout(()=>{btn.classList.remove('no');document.getElementById('fb'+sec).className='fb';gen(sec);},1800);
   }
+}
+function nextQuestion(fromSec){
+  // pick a random different section
+  const opts=[0,1,2,3,4].filter(i=>i!==fromSec);
+  const next=opts[Math.floor(Math.random()*opts.length)];
+  // reset it
+  isDone[next]=false;
+  if(next!==3){
+    document.getElementById('fb'+next).className='fb';
+    document.getElementById('nx'+next).style.display='none';
+  }
+  // switch to it and generate question
+  goTo(next);
+  if(next===0)genRect();
+  else if(next===1)genFrame();
+  else if(next===2)genTri();
+  else if(next===3)newDraw();
+  else if(next===4)genMissing();
 }
 function resetSec(sec){isDone[sec]=false;document.getElementById('fb'+sec).className='fb';document.getElementById('nx'+sec).style.display='none';}
 
@@ -1014,7 +1027,7 @@ function chkDraw(){
     fb.innerHTML=WINS[rnd(0,WINS.length-1)]+'<div class="fb-sub">שרטוט מושלם! +1 דקת מסך 📺</div>'
       +`<div class="area-q">📐 מה השטח של מה שסרטת? <b style="color:#FFD600">${area} סמ"ר</b></div>`;
     addScore(1);incStreak();addSecProgress(3);trackCorrect(3);
-    setTimeout(()=>rotateRandom(3),2000);
+    setTimeout(()=>nextQuestion(3),2000);
   } else {
     trackWrong(3);fb.className='fb no';fb.innerHTML='לא מדויק 💪<div class="fb-sub">נדרש: '+(t.shape==='sq'?'ריבוע '+t.s+'×'+t.s:'מלבן '+t.w+'×'+t.h)+'</div>';
     setTimeout(()=>newDraw(),2000);
