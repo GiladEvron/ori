@@ -183,7 +183,12 @@ async function renderStats(){
   try{
     const r=await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json',{method:'GET',headers:{'Accept':'application/json'}});
     const raw=await r.json();
-    if(raw && typeof raw==='object' && (raw.correct||raw.totalMinutes)){d=raw;isDemo=false;}
+    if(raw && typeof raw==='object' && raw.wrong!==undefined){
+      // Firebase converts arrays to objects - convert back
+      if(raw.correct && !Array.isArray(raw.correct)) raw.correct=Object.values(raw.correct);
+      if(raw.wrong && !Array.isArray(raw.wrong)) raw.wrong=Object.values(raw.wrong);
+      d=raw;isDemo=false;
+    }
     else{d={totalTime:2340,correct:[18,12,9,14,7],wrong:[3,8,5,2,9],screenMinutes:23};isDemo=true;}
   }catch(e){d={totalTime:2340,correct:[18,12,9,14,7],wrong:[3,8,5,2,9],screenMinutes:23};isDemo=true;}
   const correct=d.correct||[0,0,0,0,0],wrong=d.wrong||[0,0,0,0,0];
