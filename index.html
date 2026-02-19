@@ -756,23 +756,20 @@ function updateStreakUI(){
   }
 }
 let totalAnswered=0;
+let currentSec=0;
 function addSecProgress(sec){
   secProgress[sec]=Math.min(secProgress[sec]+1,10);
   const n=secProgress[sec];
   document.getElementById('pn'+sec).textContent=n;
   document.getElementById('pb'+sec).style.width=(n/10*100)+'%';
   if(n>0)document.getElementById('tp'+sec).textContent=n+'/10';
-  // every 5 correct answers - switch to random section
   totalAnswered++;
-  if(totalAnswered%5===0){
-    setTimeout(()=>autoRotate(sec),1200);
-  }
 }
-function autoRotate(currentSec){
-  const others=[0,1,2,3,4].filter(i=>i!==currentSec);
+function rotateRandom(fromSec){
+  const others=[0,1,2,3,4].filter(i=>i!==fromSec);
   const next=others[rnd(0,others.length-1)];
+  currentSec=next;
   goTo(next);
-  // generate new question in new section
   if(next===0)genRect();
   else if(next===1)genFrame();
   else if(next===2)genTri();
@@ -794,15 +791,17 @@ function pick(sec,btn,v,correct){
     isDone[sec]=true;btn.classList.add('ok');lockMCQ('mc'+sec);
     boom(80);
     showFb('fb'+sec,'ok',WINS[rnd(0,WINS.length-1)],'+1 דקת מסך 📺');
-    document.getElementById('nx'+sec).style.display='block';
+    document.getElementById('nx'+sec).style.display='none';
     addScore(1);
     incStreak();
     addSecProgress(sec);
     trackCorrect(sec);
+    // after 1.5 sec - go to random new section
+    setTimeout(()=>rotateRandom(sec),1500);
   } else {
     btn.classList.add('no');showFb('fb'+sec,'no','התשובה לא נכונה 💪','תתרכז ותנסה שוב!');
     trackWrong(sec);
-    setTimeout(()=>{btn.classList.remove('no');document.getElementById('fb'+sec).className='fb';},1800);
+    setTimeout(()=>{btn.classList.remove('no');document.getElementById('fb'+sec).className='fb';gen(sec);},2000);
   }
 }
 function resetSec(sec){isDone[sec]=false;document.getElementById('fb'+sec).className='fb';document.getElementById('nx'+sec).style.display='none';}
@@ -1012,10 +1011,11 @@ function chkDraw(){
     fb.className='fb ok';
     fb.innerHTML=WINS[rnd(0,WINS.length-1)]+'<div class="fb-sub">שרטוט מושלם! +1 דקת מסך 📺</div>'
       +`<div class="area-q">📐 מה השטח של מה שסרטת? <b style="color:#FFD600">${area} סמ"ר</b></div>`;
-    document.getElementById('nx3').style.display='block';
     addScore(1);incStreak();addSecProgress(3);trackCorrect(3);
+    setTimeout(()=>rotateRandom(3),2000);
   } else {
     trackWrong(3);fb.className='fb no';fb.innerHTML='לא מדויק 💪<div class="fb-sub">נדרש: '+(t.shape==='sq'?'ריבוע '+t.s+'×'+t.s:'מלבן '+t.w+'×'+t.h)+'</div>';
+    setTimeout(()=>newDraw(),2000);
   }
 }
 
@@ -1033,6 +1033,14 @@ function goTo(idx){
   card.style.borderColor=c;card.style.boxShadow=`0 0 34px ${c}50,0 0 0 1px #07090F`;
   window.scrollTo({top:0,behavior:'smooth'});
 }
+function goToAndGen(idx){
+  goTo(idx);
+  if(idx===0)genRect();
+  else if(idx===1)genFrame();
+  else if(idx===2)genTri();
+  else if(idx===3)newDraw();
+  else if(idx===4)genMissing();
+}
 
 // ── SPLASH → APP ──
 async function startApp(){
@@ -1044,7 +1052,7 @@ async function startApp(){
   setTimeout(async()=>{
     splash.classList.add('splash-hidden');
     app.classList.add('show');
-    await loadStats();genRect();genFrame();genTri();genMissing();
+    await loadStats();genRect();genFrame();genTri();genMissing();const startSec=rnd(0,4);goTo(startSec);
     setTimeout(initDraw,80);
   },500);
 }
