@@ -769,6 +769,8 @@ function rotateRandom(fromSec){
   const others=[0,1,2,3,4].filter(i=>i!==fromSec);
   const next=others[rnd(0,others.length-1)];
   currentSec=next;
+  // reset the target section so it's answerable
+  if(next!==3){isDone[next]=false;document.getElementById('fb'+next).className='fb';document.getElementById('nx'+next).style.display='none';}
   goTo(next);
   if(next===0)genRect();
   else if(next===1)genFrame();
