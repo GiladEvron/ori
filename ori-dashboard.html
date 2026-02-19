@@ -165,11 +165,11 @@ function updateKnob(v){
 async function saveDifficulty(){
   const v=parseInt(document.getElementById('diffSlider').value);
   try{
-    await window.storage.set('ori:difficulty',String(v));
-    const r=await window.storage.get('ori:stats');
-    const d=r&&r.value?JSON.parse(r.value):{correct:[0,0,0,0,0],wrong:[0,0,0,0,0],screenMinutes:0,totalTime:0};
+    await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/difficulty.json',{method:'PUT',body:JSON.stringify(v)});
+    const r=await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json');
+    const d=r.ok&&await r.json()||{correct:[0,0,0,0,0],wrong:[0,0,0,0,0],screenMinutes:0,totalTime:0};
     d.difficulty=v;
-    await window.storage.set('ori:stats',JSON.stringify(d));
+    await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json',{method:'PUT',body:JSON.stringify(d)});
   }catch(e){}
   document.getElementById('diffSaved').textContent='✅ נשמר! אורי יקבל שאלות ברמה '+v;
   setTimeout(()=>{document.getElementById('diffSaved').textContent='';},3000);
@@ -179,10 +179,12 @@ async function saveDifficulty(){
 // difficulty loaded in init below
 
 async function renderStats(){
+  const FB='https://ori-geo-default-rtdb.firebaseio.com';
   let d,isDemo;
   try{
-    const r=await window.storage.get('ori:stats');
-    if(r&&r.value){d=JSON.parse(r.value);isDemo=false;}else{d={totalTime:2340,correct:[18,12,9,14,7],wrong:[3,8,5,2,9],screenMinutes:23};isDemo=true;}
+    const r=await fetch(FB+'/ori/stats.json');
+    if(r.ok){const raw=await r.json();if(raw){d=raw;isDemo=false;}else{d={totalTime:2340,correct:[18,12,9,14,7],wrong:[3,8,5,2,9],screenMinutes:23};isDemo=true;}}
+    else{d={totalTime:2340,correct:[18,12,9,14,7],wrong:[3,8,5,2,9],screenMinutes:23};isDemo=true;}
   }catch(e){d={totalTime:2340,correct:[18,12,9,14,7],wrong:[3,8,5,2,9],screenMinutes:23};isDemo=true;}
   const correct=d.correct||[0,0,0,0,0],wrong=d.wrong||[0,0,0,0,0];
   const tc=correct.reduce((a,b)=>a+b,0),tw=wrong.reduce((a,b)=>a+b,0),tq=tc+tw;
@@ -226,24 +228,24 @@ async function renderStats(){
 
 async function resetAll(){
   if(!confirm('לאפס את כל הנתונים של אורי לגמרי? (דקות, תשובות, הכל)'))return;
-  try{await window.storage.delete('ori:stats');}catch(e){}
-  try{await window.storage.delete('ori:difficulty');}catch(e){}
+  try{
+    await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori.json',{method:'DELETE'});
+  }catch(e){}
   alert('✅ כל הנתונים אופסו!');
   renderStats();
 }
 async function resetMinutes(){
   if(!confirm('לאפס את דקות המסך של אורי?'))return;
   try{
-    const r=await window.storage.get('ori:stats');
-    if(r&&r.value){const d=JSON.parse(r.value);d.screenMinutes=0;await window.storage.set('ori:stats',JSON.stringify(d));}
+    const r=await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json');
+    if(r.ok){const d=await r.json();if(d){d.screenMinutes=0;await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json',{method:'PUT',body:JSON.stringify(d)});}}
   }catch(e){}
   renderStats();
 }
 
 (async()=>{
-  // load saved difficulty
   let savedDiff=5;
-  try{const rd=await window.storage.get('ori:difficulty');if(rd&&rd.value)savedDiff=parseInt(rd.value)||5;}catch(e){}
+  try{const r=await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/difficulty.json');if(r.ok){const d=await r.json();if(d)savedDiff=parseInt(d)||5;}}catch(e){}
   document.getElementById('diffSlider').value=savedDiff;
   updateKnob(savedDiff);
   await renderStats();
