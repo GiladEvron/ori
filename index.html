@@ -706,6 +706,7 @@ function saveStats(){
     try{await window.storage.set('ori:stats',JSON.stringify(stats));}catch(e){}
   },1500);
 }
+function trackScreen(min){stats.screenMinutes=(stats.screenMinutes||0)+min;saveStats();}
 function trackCorrect(sec){stats.correct[sec]=(stats.correct[sec]||0)+1;saveStats();}
 function trackWrong(sec){stats.wrong[sec]=(stats.wrong[sec]||0)+1;saveStats();}
 function trackTime(){
