@@ -184,8 +184,8 @@ async function renderStats(){
   try{
     const r=await fetch(FB+'/ori/stats.json');
     if(r.ok){const raw=await r.json();if(raw){d=raw;isDemo=false;}else{d={totalTime:2340,correct:[18,12,9,14,7],wrong:[3,8,5,2,9],screenMinutes:23};isDemo=true;}}
-    else{d={totalTime:2340,correct:[18,12,9,14,7],wrong:[3,8,5,2,9],screenMinutes:23};isDemo=true;}
-  }catch(e){d={totalTime:2340,correct:[18,12,9,14,7],wrong:[3,8,5,2,9],screenMinutes:23};isDemo=true;}
+    else{console.error('Firebase status:',r.status);d={totalTime:2340,correct:[18,12,9,14,7],wrong:[3,8,5,2,9],screenMinutes:23};isDemo=true;}
+  }catch(e){console.error('Firebase error:',e);d={totalTime:2340,correct:[18,12,9,14,7],wrong:[3,8,5,2,9],screenMinutes:23};isDemo=true;}
   const correct=d.correct||[0,0,0,0,0],wrong=d.wrong||[0,0,0,0,0];
   const tc=correct.reduce((a,b)=>a+b,0),tw=wrong.reduce((a,b)=>a+b,0),tq=tc+tw;
   const pct=tq>0?Math.round(tc/tq*100):0;
