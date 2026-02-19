@@ -77,6 +77,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .start-btn:active{background:rgba(0,229,255,.2);}
 @keyframes sbpulse{0%,100%{box-shadow:0 0 28px rgba(0,229,255,.4);}50%{box-shadow:0 0 50px rgba(0,229,255,.7);}}
 
+.area-q{margin-top:10px;padding:8px 12px;background:rgba(255,214,0,.1);border:1.5px solid rgba(255,214,0,.4);border-radius:8px;font-size:15px;font-weight:900;color:rgba(216,238,255,.8);}
 /* ── MAIN APP ── */
 #app{display:none;padding:14px 12px 60px;}
 #app.show{display:block;}
@@ -147,8 +148,8 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 
 /* ── FORMULA ── */
 .fml{display:flex;justify-content:center;margin-bottom:10px;}
-.chip{font-family:'Orbitron',monospace;font-size:13px;letter-spacing:1.5px;color:#00E5FF;
-  background:rgba(0,229,255,.1);border:1.5px solid rgba(0,229,255,.3);border-radius:6px;padding:5px 16px;direction:ltr;}
+.chip{font-family:'Heebo','Arial Hebrew',sans-serif;font-size:20px;font-weight:900;letter-spacing:0;color:#00E5FF;
+  background:rgba(0,229,255,.1);border:1.5px solid rgba(0,229,255,.3);border-radius:8px;padding:8px 20px;direction:rtl;}
 
 /* ── QTEXT ── */
 .qtext{font-size:21px;font-weight:900;text-align:center;line-height:1.5;color:#D8EEFF;margin-bottom:16px;}
@@ -528,14 +529,25 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 // ── UTILS ──
 const rnd=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
-function choices(correct){
+function choices(correct,type){
   const s=new Set([correct]);
-  const d=[-8,-6,-5,-4,-3,-2,2,3,4,5,6,8,10,-10],p=[.5,.75,1.25,1.5,2];
-  let t=0;
-  while(s.size<4&&t++<120){
-    const w=Math.random()<.5?correct+d[rnd(0,d.length-1)]:Math.round(correct*p[rnd(0,p.length-1)]);
-    if(w>0&&w!==correct)s.add(w);
+  let candidates=[];
+  if(type==='perim'){
+    // היקף — תמיד זוגי, הפרשים של 2,4,6,8
+    for(const d of[-8,-6,-4,-2,2,4,6,8,10,12]){const w=correct+d;if(w>0)candidates.push(w);}
+  } else if(type==='area'){
+    // שטח — כפולות קרובות
+    for(const d of[-12,-10,-8,-6,-4,-3,3,4,6,8,10,12,15,16]){const w=correct+d;if(w>0)candidates.push(w);}
+    candidates.push(Math.round(correct*1.5),Math.round(correct*2),Math.round(correct*0.5));
+  } else if(type==='side'){
+    // צלע — מספרים קרובים
+    for(const d of[-4,-3,-2,-1,1,2,3,4,5]){const w=correct+d;if(w>0)candidates.push(w);}
+  } else {
+    for(const d of[-8,-6,-4,-3,-2,2,3,4,6,8,10,-10]){const w=correct+d;if(w>0)candidates.push(w);}
+    candidates.push(Math.round(correct*1.5),Math.round(correct*2));
   }
+  candidates=shuffle([...new Set(candidates)].filter(w=>w!==correct&&w>0));
+  for(const w of candidates){if(s.size<4)s.add(w);}
   let k=1;while(s.size<4)s.add(correct+k++);
   return shuffle([...s]);
 }
@@ -595,6 +607,43 @@ ${nb(W/2,BY-26,A,col,26)}${nb(BX-34,BY+BH/2,B,col,26)}${nb(W/2,hy+hh/2,a+'×'+b,
 </svg>`;
 }
 
+function svgLshape(W,H,cw,ch,col){
+  const sc=16,px=30,py=20,TW=W*sc,TH=H*sc,CW=cw*sc,CH=ch*sc;
+  // L-shape polygon (remaining area)
+  const pts=`${px},${py} ${px+TW-CW},${py} ${px+TW-CW},${py+CH} ${px+TW},${py+CH} ${px+TW},${py+TH} ${px},${py+TH}`;
+  const VW=TW+90,VH=TH+70;
+  // corner cut-out x,y
+  const cx=px+TW-CW, cy=py;
+  return `<svg viewBox="0 0 ${VW} ${VH}" xmlns="http://www.w3.org/2000/svg" overflow="visible">${DF}
+<!-- remaining L area - pulsing fill -->
+<polygon points="${pts}" fill="${col}30" stroke="${col}" stroke-width="2.5" stroke-linejoin="round">
+  <animate attributeName="fill-opacity" values=".18;.45;.18" dur="1.6s" repeatCount="indefinite"/>
+</polygon>
+<polygon points="${pts}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round"/>
+<!-- cut corner - dashed -->
+<rect x="${cx}" y="${cy}" width="${CW}" height="${CH}" fill="#FF1F6E18" stroke="#FF1F6E" stroke-width="2" stroke-dasharray="5,3">
+  <animate attributeName="stroke-opacity" values="1;.3;1" dur="1s" repeatCount="indefinite"/>
+</rect>
+<!-- outer dimensions -->
+${nb(px+TW/2, py-26, W, col, 22)}
+${nb(px-30, py+TH/2, H, col, 22)}
+<!-- cut corner dimensions ON the dashed lines -->
+<text x="${cx+CW/2}" y="${cy-10}" fill="#FF1F6E" font-family="Orbitron,monospace" font-weight="900" font-size="14" text-anchor="middle">${cw}</text>
+<text x="${cx+CW+14}" y="${cy+CH/2+5}" fill="#FF1F6E" font-family="Orbitron,monospace" font-weight="900" font-size="14" text-anchor="start">${ch}</text>
+</svg>`;
+}
+function svgTshape(a1,b1,a2,b2,col){
+  const sc=16,px=30,py=15,W1=a1*sc,H1=b1*sc,W2=a2*sc,H2=b2*sc;
+  const x2=px+Math.max(0,(W1-W2)/2),y2=py+H1;
+  const VW=Math.max(W1,W2)+80,VH=H1+H2+60;
+  return `<svg viewBox="0 0 ${VW} ${VH}" xmlns="http://www.w3.org/2000/svg" overflow="visible">${DF}
+<rect x="${px}" y="${py}" width="${W1}" height="${H1}" fill="${col}16" stroke="${col}" stroke-width="2.5" rx="3"/>
+<rect x="${x2}" y="${y2}" width="${W2}" height="${H2}" fill="${col}22" stroke="${col}" stroke-width="2.5" rx="3"/>
+${nb(px+W1/2,py-22,a1,col,22)}${nb(px-26,py+H1/2,b1,col,22)}
+${nb(x2+W2/2,y2+H2+22,a2,'#FF1F6E',22)}${nb(x2-26,y2+H2/2,b2,'#FF1F6E',22)}
+</svg>`;
+}
+
 function svgTri(a,b,c,col,hl,hideC){
   const W=380,H=205,px=[190,W-55,55],py=[42,H-46,H-46];
   const pts=`${px[0]},${py[0]} ${px[1]},${py[1]} ${px[2]},${py[2]}`,pL=420;
@@ -608,9 +657,9 @@ ${fA}${pA}${nb(lx,ly,a,col,26)}${nb(rx2,ry2,b,col,26)}${hideC?qb(bx,by,'#FF1F6E'
 }
 
 // ── MCQ ──
-function buildMCQ(id,correct,onPick){
+function buildMCQ(id,correct,onPick,type){
   const el=document.getElementById(id);el.innerHTML='';
-  choices(correct).forEach(v=>{
+  choices(correct,type).forEach(v=>{
     const btn=document.createElement('button');btn.className='mb';btn.textContent=v;
     btn.onclick=()=>onPick(btn,v,correct);el.appendChild(btn);
   });
@@ -619,14 +668,63 @@ function lockMCQ(id){document.querySelectorAll('#'+id+' .mb').forEach(b=>{b.disa
 function showFb(id,cls,msg,sub){const el=document.getElementById(id);el.className='fb '+cls;el.innerHTML=msg+(sub?`<div class="fb-sub">${sub}</div>`:'');}
 
 // ── SCORING ──
-let totalScore=0;       // total airtime minutes
-let bonusStreak=0;      // correct answers since last bonus
-const BONUS_TRIGGER=4;  // bonus every 4 correct
+let totalScore=0;
+let bonusStreak=0;
+const BONUS_TRIGGER=4;
 let bonusReady=false;
 const secProgress={0:0,1:0,2:0,3:0,4:0};
 
+// ── DATA TRACKING ──
+const SEC_NAMES=['מלבן וריבוע','צורות מורכבות','משולש','שרטוט','צלע חסרה'];
+let stats={
+  sessionStart: Date.now(),
+  totalMinutes: 0,
+  correct: [0,0,0,0,0],   // per section
+  wrong:   [0,0,0,0,0],   // per section
+  sessions: []
+};
+async function loadStats(){
+  try{
+    const r=await window.storage.get('ori:stats');
+    if(r&&r.value){
+      const s=JSON.parse(r.value);
+      if(s){stats.totalMinutes=s.totalMinutes||0;stats.correct=s.correct||[0,0,0,0,0];stats.wrong=s.wrong||[0,0,0,0,0];stats.sessions=s.sessions||[];stats.screenMinutes=s.screenMinutes||0;}
+      totalScore=stats.totalMinutes;
+      document.getElementById('scoreBox').textContent='📺 '+totalScore+' דק׳';
+    }
+  }catch(e){}
+  try{
+    const rd=await window.storage.get('ori:difficulty');
+    if(rd&&rd.value)window._oriDifficulty=parseInt(rd.value)||5;
+  }catch(e){}
+}
+let _saveTimer=null;
+function saveStats(){
+  stats.totalMinutes=totalScore;
+  clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(async()=>{
+    try{await window.storage.set('ori:stats',JSON.stringify(stats));}catch(e){}
+  },1500);
+}
+function trackCorrect(sec){stats.correct[sec]=(stats.correct[sec]||0)+1;saveStats();}
+function trackWrong(sec){stats.wrong[sec]=(stats.wrong[sec]||0)+1;saveStats();}
+function trackTime(){
+  const mins=Math.round((Date.now()-stats.sessionStart)/60000);
+  if(mins>0){
+    stats.sessions.push({date:new Date().toLocaleDateString('he-IL'),mins});
+    // keep last 30 sessions only
+    if(stats.sessions.length>30)stats.sessions=stats.sessions.slice(-30);
+  }
+  saveStats();
+}
+// save session time every minute
+setInterval(()=>{trackTime();},60000);
+window.addEventListener('beforeunload',trackTime);
+
 function addScore(min){
   totalScore+=min;
+  stats.totalMinutes+=min;
+  trackScreen(min);
   document.getElementById('scoreBox').textContent='📺 '+totalScore+' דק׳';
   // flash
   const sb=document.getElementById('scoreBox');
@@ -673,8 +771,10 @@ function pick(sec,btn,v,correct){
     addScore(1);
     incStreak();
     addSecProgress(sec);
+    trackCorrect(sec);
   } else {
     btn.classList.add('no');showFb('fb'+sec,'no','התשובה לא נכונה 💪','תתרכז ותנסה שוב!');
+    trackWrong(sec);
     setTimeout(()=>{btn.classList.remove('no');document.getElementById('fb'+sec).className='fb';},1800);
   }
 }
@@ -690,29 +790,55 @@ function gen(sec){
 }
 
 function genRect(){
-  const tp=rnd(0,3),CY='#00E5FF',YE='#FFD600',GR='#00FF85',MA='#FF1F6E';
-  let ans,shape,chip,q;
-  if(tp===0){const a=rnd(3,12),b=rnd(3,10);ans=a*b;shape=svgRect(a,b,CY,'area',false);chip='A = a × b';q=`מלבן <b style="color:${CY}">a=${a}</b>, <b style="color:${CY}">b=${b}</b> — מה ה<b style="color:${MA}">שטח</b>?`;}
-  else if(tp===1){const a=rnd(3,12),b=rnd(3,10);ans=2*(a+b);shape=svgRect(a,b,YE,'perim',false);chip='P = 2×(a+b)';q=`מלבן <b style="color:${YE}">a=${a}</b>, <b style="color:${YE}">b=${b}</b> — מה ה<b style="color:${MA}">היקף</b>?`;}
-  else if(tp===2){const s=rnd(3,12);ans=s*s;shape=svgRect(s,s,GR,'area',false);chip='A = a²';q=`ריבוע, צלע=<b style="color:${GR}">${s}</b> — מה ה<b style="color:${MA}">שטח</b>?`;}
-  else{const s=rnd(3,12);ans=4*s;shape=svgRect(s,s,YE,'perim',false);chip='P = 4×a';q=`ריבוע, צלע=<b style="color:${YE}">${s}</b> — מה ה<b style="color:${MA}">היקף</b>?`;}
-  document.getElementById('sh0').innerHTML=shape;
-  document.getElementById('fo0').innerHTML=`<div class="chip">${chip}</div>`;
-  document.getElementById('qt0').innerHTML=q;
-  buildMCQ('mc0',ans,(btn,v,c)=>pick(0,btn,v,c));
+  const CY='#00E5FF',YE='#FFD600',GR='#00FF85',MA='#FF1F6E';
+  const pool=[
+    // עמ' 78 - שטח
+    ()=>({ans:21,shape:svgRect(7,3,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">7</b>, רוחב=<b style="color:${CY}">3</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({ans:20,shape:svgRect(5,4,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">5</b>, רוחב=<b style="color:${CY}">4</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({ans:9,shape:svgRect(3,3,GR,'area',false),type:'area',chip:'שטח = צלע × צלע',q:`ריבוע צלע=<b style="color:${GR}">3</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({ans:12,shape:svgRect(3,4,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">4</b>, רוחב=<b style="color:${CY}">3</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    // עמ' 95 - היקף
+    ()=>({ans:12,shape:svgRect(4,2,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">4</b>, רוחב=<b style="color:${YE}">2</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({ans:20,shape:svgRect(5,5,YE,'perim',false),type:'perim',chip:'היקף = 4 × צלע',q:`ריבוע צלע=<b style="color:${YE}">5</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({ans:20,shape:svgRect(7,3,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">7</b>, רוחב=<b style="color:${YE}">3</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({ans:14,shape:svgRect(6,1,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">6</b>, רוחב=<b style="color:${YE}">1</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({ans:12,shape:svgRect(3,3,YE,'perim',false),type:'perim',chip:'היקף = 4 × צלע',q:`ריבוע צלע=<b style="color:${YE}">3</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    // שאלות ברמה דומה
+    ()=>{const a=rnd(4,12),b=rnd(2,7);return{ans:a*b,shape:svgRect(a,b,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">${a}</b>, רוחב=<b style="color:${CY}">${b}</b> — מה ה<b style="color:${MA}">שטח</b>?`};},
+    ()=>{const s=rnd(3,9);return{ans:s*s,shape:svgRect(s,s,GR,'area',false),type:'area',chip:'שטח = צלע × צלע',q:`ריבוע צלע=<b style="color:${GR}">${s}</b> — מה ה<b style="color:${MA}">שטח</b>?`};},
+    ()=>{const a=rnd(4,12),b=rnd(2,6);return{ans:2*(a+b),shape:svgRect(a,b,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">${a}</b>, רוחב=<b style="color:${YE}">${b}</b> — מה ה<b style="color:${MA}">היקף</b>?`};},
+    ()=>{const s=rnd(3,9);return{ans:4*s,shape:svgRect(s,s,YE,'perim',false),type:'perim',chip:'היקף = 4 × צלע',q:`ריבוע צלע=<b style="color:${YE}">${s}</b> — מה ה<b style="color:${MA}">היקף</b>?`};},
+  ];
+  const p=pool[rnd(0,pool.length-1)]();
+  document.getElementById('sh0').innerHTML=p.shape;
+  document.getElementById('fo0').innerHTML=`<div class="chip">${p.chip}</div>`;
+  document.getElementById('qt0').innerHTML=p.q;
+  buildMCQ('mc0',p.ans,(btn,v,c)=>pick(0,btn,v,c),p.type);
 }
 
 function genFrame(){
-  const A=rnd(6,13),B=rnd(5,10),a=rnd(2,A-3),b=rnd(2,B-2);
-  const tp=rnd(0,2),OR='#FF8C00',MA='#FF1F6E';
-  let ans,chip,q;
-  if(tp===0){ans=A*B-a*b;chip='שטח = גדול − חור';q=`מסגרת <b style="color:${OR}">${A}×${B}</b>, חור <b style="color:${MA}">${a}×${b}</b> — מה ה<b style="color:${MA}">שטח</b>?`;}
-  else if(tp===1){ans=A*B;chip='A = a × b';q=`מלבן גדול <b style="color:${OR}">${A}×${B}</b> — מה ה<b style="color:${MA}">שטח הגדול</b>?`;}
-  else{ans=a*b;chip='A = a × b';q=`חור <b style="color:${MA}">${a}×${b}</b> — מה ה<b style="color:${MA}">שטח החור</b>?`;}
-  document.getElementById('sh1').innerHTML=svgFrame(A,B,a,b,OR);
-  document.getElementById('fo1').innerHTML=`<div class="chip">${chip}</div>`;
-  document.getElementById('qt1').innerHTML=q;
-  buildMCQ('mc1',ans,(btn,v,c)=>pick(1,btn,v,c));
+  const OR='#FF8C00',MA='#FF1F6E';
+  const pool=[
+    // עמ' 82 - חיבור
+    ()=>({ans:55+16,shape:svgTshape(11,5,4,4,OR),chip:'שטח = מלבן א + מלבן ב',q:`צורה מורכבת: <b style="color:${OR}">11×5</b> + <b style="color:${MA}">4×4</b> — מה ה<b style="color:${MA}">שטח הכולל</b>?`}),
+    ()=>({ans:33+6,shape:svgTshape(11,3,3,2,OR),chip:'שטח = מלבן א + מלבן ב',q:`צורה מורכבת: <b style="color:${OR}">11×3</b> + <b style="color:${MA}">3×2</b> — מה ה<b style="color:${MA}">שטח הכולל</b>?`}),
+    // עמ' 80 - שני ריבועים
+    ()=>({ans:18,shape:svgTshape(3,3,3,3,OR),chip:'שטח = ריבוע א + ריבוע ב',q:`שני ריבועים <b style="color:${OR}">3×3</b> — מה ה<b style="color:${MA}">שטח הכולל</b>?`}),
+    ()=>({ans:25,shape:svgTshape(4,4,3,3,OR),chip:'שטח = ריבוע א + ריבוע ב',q:`ריבוע <b style="color:${OR}">4×4</b> + ריבוע <b style="color:${MA}">3×3</b> — מה ה<b style="color:${MA}">שטח הכולל</b>?`}),
+    ()=>({ans:24+15,shape:svgTshape(8,3,5,3,OR),chip:'שטח = מלבן א + מלבן ב',q:`מלבן <b style="color:${OR}">8×3</b> + מלבן <b style="color:${MA}">5×3</b> — מה ה<b style="color:${MA}">שטח הכולל</b>?`}),
+    // עמ' 81 - L-shape חיסור
+    ()=>({ans:5*7-2*2,shape:svgLshape(7,5,2,2,OR),chip:'שטח = מלבן גדול − פינה',q:`מלבן <b style="color:${OR}">7×5</b>, חתכנו פינה <b style="color:${MA}">2×2</b> — מה ה<b style="color:${MA}">שטח שנשאר</b>?`}),
+    ()=>({ans:8*4-3*3,shape:svgLshape(8,4,3,3,OR),chip:'שטח = מלבן גדול − פינה',q:`מלבן <b style="color:${OR}">8×4</b>, חתכנו פינה <b style="color:${MA}">3×3</b> — מה ה<b style="color:${MA}">שטח שנשאר</b>?`}),
+    ()=>({ans:6*4-2*3,shape:svgLshape(6,4,2,3,OR),chip:'שטח = מלבן גדול − פינה',q:`מלבן <b style="color:${OR}">6×4</b>, חתכנו פינה <b style="color:${MA}">2×3</b> — מה ה<b style="color:${MA}">שטח שנשאר</b>?`}),
+    // שאלות ברמה דומה
+    ()=>{const a1=rnd(5,11),b1=rnd(2,5),a2=rnd(2,5),b2=rnd(2,4);return{ans:a1*b1+a2*b2,shape:svgTshape(a1,b1,a2,b2,OR),chip:'שטח = מלבן א + מלבן ב',q:`צורה מורכבת: <b style="color:${OR}">${a1}×${b1}</b> + <b style="color:${MA}">${a2}×${b2}</b> — מה ה<b style="color:${MA}">שטח הכולל</b>?`};},
+    ()=>{const W=rnd(6,10),H=rnd(4,7),cw=rnd(2,W-2),ch=rnd(2,H-2);return{ans:W*H-cw*ch,shape:svgLshape(W,H,cw,ch,OR),chip:'שטח = מלבן גדול − פינה',q:`מלבן <b style="color:${OR}">${W}×${H}</b>, חתכנו פינה <b style="color:${MA}">${cw}×${ch}</b> — מה ה<b style="color:${MA}">שטח שנשאר</b>?`};},
+  ];
+  const p=pool[rnd(0,pool.length-1)]();
+  document.getElementById('sh1').innerHTML=p.shape;
+  document.getElementById('fo1').innerHTML=`<div class="chip">${p.chip}</div>`;
+  document.getElementById('qt1').innerHTML=p.q;
+  buildMCQ('mc1',p.ans,(btn,v,c)=>pick(1,btn,v,c),'area');
 }
 
 function genTri(){
@@ -724,20 +850,35 @@ function genTri(){
   document.getElementById('sh2').innerHTML=shape;
   document.getElementById('fo2').innerHTML=`<div class="chip">${chip}</div>`;
   document.getElementById('qt2').innerHTML=q;
-  buildMCQ('mc2',ans,(btn,v,c)=>pick(2,btn,v,c));
+  buildMCQ('mc2',ans,(btn,v,c)=>pick(2,btn,v,c),'perim');
 }
 
 function genMissing(){
-  const tp=rnd(0,3),MA='#FF1F6E';
-  let ans,shape,chip,q;
-  if(tp===0){const a=rnd(3,11),b=rnd(3,11);ans=b;shape=svgRect(a,b,MA,'area',true);chip='b = שטח ÷ a';q=`שטח=<b style="color:${MA}">${a*b}</b>, a=<b style="color:${MA}">${a}</b> — מה <b style="color:${MA}">b</b>?`;}
-  else if(tp===1){const sides=[2,3,4,5,6,7,8,9,10];const s=sides[rnd(0,sides.length-1)];ans=s;shape=svgRect(s,s,MA,'area',true);chip='s = √שטח';q=`ריבוע, שטח=<b style="color:${MA}">${s*s}</b> — מה ה<b style="color:${MA}">צלע</b>?`;}
-  else if(tp===2){const a=rnd(3,10),b=rnd(3,10);ans=b;shape=svgRect(a,b,MA,'perim',true);chip='b = (P÷2) − a';q=`היקף=<b style="color:${MA}">${2*(a+b)}</b>, a=<b style="color:${MA}">${a}</b> — מה <b style="color:${MA}">b</b>?`;}
-  else{const s=rnd(3,12);ans=s;shape=svgRect(s,s,MA,'perim',true);chip='s = P ÷ 4';q=`ריבוע, היקף=<b style="color:${MA}">${4*s}</b> — מה ה<b style="color:${MA}">צלע</b>?`;}
-  document.getElementById('sh4').innerHTML=shape;
-  document.getElementById('fo4').innerHTML=`<div class="chip">${chip}</div>`;
-  document.getElementById('qt4').innerHTML=q;
-  buildMCQ('mc4',ans,(btn,v,c)=>pick(4,btn,v,c));
+  const MA='#FF1F6E';
+  const pool=[
+    // עמ' 83 - שטח נתון
+    ()=>({ans:4, shape:svgRect(16,4,MA,'area',true),chip:'רוחב = שטח ÷ אורך',q:`שטח=<b style="color:${MA}">64 סמ"ר</b>, אורך=<b style="color:${MA}">16</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({ans:2, shape:svgRect(12,2,MA,'area',true),chip:'רוחב = שטח ÷ אורך',q:`שטח=<b style="color:${MA}">24 סמ"ר</b>, אורך=<b style="color:${MA}">12</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({ans:6, shape:svgRect(6,6,MA,'area',true),chip:'צלע = √שטח',q:`ריבוע, שטח=<b style="color:${MA}">36 סמ"ר</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
+    ()=>({ans:4, shape:svgRect(7,4,MA,'area',true),chip:'רוחב = שטח ÷ אורך',q:`שטח=<b style="color:${MA}">28 סמ"ר</b>, אורך=<b style="color:${MA}">7</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({ans:6, shape:svgRect(8,6,MA,'area',true),chip:'רוחב = שטח ÷ אורך',q:`שטח=<b style="color:${MA}">48 סמ"ר</b>, אורך=<b style="color:${MA}">8</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({ans:3, shape:svgRect(3,3,MA,'area',true),chip:'צלע = √שטח',q:`ריבוע, שטח=<b style="color:${MA}">9 סמ"ר</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
+    // עמ' 98 - היקף נתון
+    ()=>({ans:9, shape:svgRect(9,9,MA,'perim',true),chip:'צלע = היקף ÷ 4',q:`ריבוע, היקף=<b style="color:${MA}">36 סמ"מ</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
+    ()=>({ans:4, shape:svgRect(16,4,MA,'perim',true),chip:'רוחב = (היקף÷2) − אורך',q:`היקף=<b style="color:${MA}">40 סמ"מ</b>, אורך=<b style="color:${MA}">16</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({ans:12,shape:svgRect(2,12,MA,'perim',true),chip:'רוחב = (היקף÷2) − אורך',q:`היקף=<b style="color:${MA}">28 סמ"מ</b>, אורך=<b style="color:${MA}">2</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({ans:7, shape:svgRect(7,7,MA,'perim',true),chip:'צלע = היקף ÷ 4',q:`ריבוע, היקף=<b style="color:${MA}">28 סמ"מ</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
+    // שאלות ברמה דומה
+    ()=>{const a=rnd(4,12),b=rnd(2,7);return{ans:b,shape:svgRect(a,b,MA,'area',true),chip:'רוחב = שטח ÷ אורך',q:`שטח=<b style="color:${MA}">${a*b} סמ"ר</b>, אורך=<b style="color:${MA}">${a}</b> — מה ה<b style="color:${MA}">רוחב</b>?`};},
+    ()=>{const s=[3,4,5,6,7,8,9][rnd(0,6)];return{ans:s,shape:svgRect(s,s,MA,'area',true),chip:'צלע = √שטח',q:`ריבוע, שטח=<b style="color:${MA}">${s*s} סמ"ר</b> — מה ה<b style="color:${MA}">צלע</b>?`};},
+    ()=>{const a=rnd(4,12),b=rnd(2,6);return{ans:b,shape:svgRect(a,b,MA,'perim',true),chip:'רוחב = (היקף÷2) − אורך',q:`היקף=<b style="color:${MA}">${2*(a+b)} סמ"מ</b>, אורך=<b style="color:${MA}">${a}</b> — מה ה<b style="color:${MA}">רוחב</b>?`};},
+    ()=>{const s=rnd(3,10);return{ans:s,shape:svgRect(s,s,MA,'perim',true),chip:'צלע = היקף ÷ 4',q:`ריבוע, היקף=<b style="color:${MA}">${4*s} סמ"מ</b> — מה ה<b style="color:${MA}">צלע</b>?`};},
+  ];
+  const p=pool[rnd(0,pool.length-1)]();
+  document.getElementById('sh4').innerHTML=p.shape;
+  document.getElementById('fo4').innerHTML=`<div class="chip">${p.chip}</div>`;
+  document.getElementById('qt4').innerHTML=p.q;
+  buildMCQ('mc4',p.ans,(btn,v,c)=>pick(4,btn,v,c),'side');
 }
 
 // ── DRAW ──
@@ -763,9 +904,67 @@ function initDraw(){
   cv.addEventListener('touchend',e=>{if(!drawing)return;drawing=false;const t=e.changedTouches[0],r=cv.getBoundingClientRect(),sc=cv.width/r.width;finalize(dstart,{x:Math.floor((t.clientX-r.left)*sc/GS),y:Math.floor((t.clientY-r.top)*sc/GS)});});
   newDraw();
 }
-function drawGrid(){if(!dctx)return;const cv=document.getElementById('gc');dctx.clearRect(0,0,cv.width,cv.height);dctx.strokeStyle='rgba(0,229,255,.11)';dctx.lineWidth=.5;for(let i=0;i<=GC;i++){dctx.beginPath();dctx.moveTo(i*GS,0);dctx.lineTo(i*GS,GR2*GS);dctx.stroke();}for(let j=0;j<=GR2;j++){dctx.beginPath();dctx.moveTo(0,j*GS);dctx.lineTo(GC*GS,j*GS);dctx.stroke();}}
-function preview(a,b){if(!dctx||!a||!b)return;const x1=Math.min(a.x,b.x)*GS,y1=Math.min(a.y,b.y)*GS,w=Math.abs(b.x-a.x)*GS,h=Math.abs(b.y-a.y)*GS;dctx.strokeStyle='rgba(0,229,255,.5)';dctx.lineWidth=2;dctx.setLineDash([4,3]);dctx.strokeRect(x1,y1,w||1,h||1);dctx.setLineDash([]);}
-function finalize(a,b){userShape={x1:Math.min(a.x,b.x),y1:Math.min(a.y,b.y),x2:Math.max(a.x,b.x),y2:Math.max(a.y,b.y)};drawGrid();const x1=userShape.x1*GS,y1=userShape.y1*GS,w=(userShape.x2-userShape.x1)*GS,h=(userShape.y2-userShape.y1)*GS;if(w<1||h<1)return;dctx.fillStyle='rgba(0,229,255,.13)';dctx.fillRect(x1,y1,w,h);dctx.strokeStyle='#00E5FF';dctx.lineWidth=2.5;dctx.setLineDash([]);dctx.strokeRect(x1,y1,w,h);}
+function drawGrid(){if(!dctx)return;const cv=document.getElementById('gc');
+  dctx.clearRect(0,0,cv.width,cv.height);
+  // filled squares background
+  dctx.fillStyle='#0A0D1A';dctx.fillRect(0,0,cv.width,cv.height);
+  // grid dots at intersections
+  for(let i=0;i<=GC;i++){for(let j=0;j<=GR2;j++){
+    dctx.beginPath();dctx.arc(i*GS,j*GS,1.5,0,Math.PI*2);
+    dctx.fillStyle='rgba(0,229,255,.35)';dctx.fill();
+  }}
+  // grid lines
+  dctx.strokeStyle='rgba(0,229,255,.18)';dctx.lineWidth=0.8;
+  for(let i=0;i<=GC;i++){dctx.beginPath();dctx.moveTo(i*GS,0);dctx.lineTo(i*GS,GR2*GS);dctx.stroke();}
+  for(let j=0;j<=GR2;j++){dctx.beginPath();dctx.moveTo(0,j*GS);dctx.lineTo(GC*GS,j*GS);dctx.stroke();}
+}
+function preview(a,b){if(!dctx||!a||!b)return;
+  const dw=Math.abs(b.x-a.x),dh=Math.abs(b.y-a.y);
+  const x1=Math.min(a.x,b.x)*GS,y1=Math.min(a.y,b.y)*GS,w=dw*GS,h=dh*GS;
+  // fill
+  dctx.fillStyle='rgba(0,229,255,.35)';dctx.fillRect(x1,y1,w||1,h||1);
+  // border
+  dctx.strokeStyle='#00E5FF';dctx.lineWidth=3;dctx.setLineDash([]);dctx.strokeRect(x1,y1,w||1,h||1);
+  // live area label
+  if(dw>0&&dh>0){
+    const area=dw*dh;
+    const label=dw+'×'+dh+'='+area+' סמ"ר';
+    dctx.font='bold 16px Orbitron,monospace';
+    const tw=dctx.measureText(label).width+16;
+    const lx=x1+w/2,ly=y1-18;
+    dctx.fillStyle='rgba(7,9,15,.92)';dctx.fillRect(lx-tw/2,ly-13,tw,22);
+    dctx.fillStyle='#FFD600';dctx.textAlign='center';dctx.textBaseline='middle';
+    dctx.fillText(label,lx,ly);
+  }
+}
+function finalize(a,b){
+  userShape={x1:Math.min(a.x,b.x),y1:Math.min(a.y,b.y),x2:Math.max(a.x,b.x),y2:Math.max(a.y,b.y)};
+  drawGrid();
+  const x1=userShape.x1*GS,y1=userShape.y1*GS;
+  const dw=userShape.x2-userShape.x1,dh=userShape.y2-userShape.y1;
+  const w=dw*GS,h=dh*GS;
+  if(w<1||h<1)return;
+  // strong fill
+  dctx.fillStyle='rgba(0,229,255,.45)';dctx.fillRect(x1,y1,w,h);
+  // inner grid on filled area
+  dctx.strokeStyle='rgba(255,255,255,.2)';dctx.lineWidth=0.5;
+  for(let i=userShape.x1;i<=userShape.x2;i++){dctx.beginPath();dctx.moveTo(i*GS,y1);dctx.lineTo(i*GS,y1+h);dctx.stroke();}
+  for(let j=userShape.y1;j<=userShape.y2;j++){dctx.beginPath();dctx.moveTo(x1,j*GS);dctx.lineTo(x1+w,j*GS);dctx.stroke();}
+  // bold border
+  dctx.strokeStyle='#00E5FF';dctx.lineWidth=3;dctx.setLineDash([]);dctx.strokeRect(x1,y1,w,h);
+  // area label above shape
+  if(dw>0&&dh>0){
+    const area=dw*dh;
+    const label=dw+'×'+dh+'='+area+' סמ"ר';
+    dctx.font='bold 16px Orbitron,monospace';
+    const tw=dctx.measureText(label).width+16;
+    const lx=x1+w/2,ly=y1-18;
+    dctx.fillStyle='rgba(7,9,15,.92)';dctx.fillRect(lx-tw/2,ly-13,tw,22);
+    dctx.fillStyle='#FFD600';dctx.textAlign='center';dctx.textBaseline='middle';
+    dctx.fillText(label,lx,ly);
+  }
+}
+
 function clrDraw(){userShape=null;drawGrid();}
 function setTool(t){dtool=t;document.getElementById('tb1').className='tbtn'+(t==='rect'?' on':'');document.getElementById('tb2').className='tbtn'+(t==='sq'?' on':'');}
 function newDraw(){
@@ -781,12 +980,15 @@ function chkDraw(){
   const dw=userShape.x2-userShape.x1,dh=userShape.y2-userShape.y1,t=dtarget;
   const ok=(t.shape==='rect'&&((dw===t.w&&dh===t.h)||(dw===t.h&&dh===t.w)))||(t.shape==='sq'&&dw===dh&&dw===t.s);
   if(ok){
-    boom(80);fb.className='fb ok';
-    fb.innerHTML=WINS[rnd(0,WINS.length-1)]+'<div class="fb-sub">שרטוט מושלם! +1 דקת מסך 📺</div>';
+    boom(80);
+    const area=(t.shape==='sq'?t.s*t.s:t.w*t.h);
+    fb.className='fb ok';
+    fb.innerHTML=WINS[rnd(0,WINS.length-1)]+'<div class="fb-sub">שרטוט מושלם! +1 דקת מסך 📺</div>'
+      +`<div class="area-q">📐 מה השטח של מה שסרטת? <b style="color:#FFD600">${area} סמ"ר</b></div>`;
     document.getElementById('nx3').style.display='block';
-    addScore(1);incStreak();addSecProgress(3);
+    addScore(1);incStreak();addSecProgress(3);trackCorrect(3);
   } else {
-    fb.className='fb no';fb.innerHTML='לא מדויק 💪<div class="fb-sub">נדרש: '+(t.shape==='sq'?'ריבוע '+t.s+'×'+t.s:'מלבן '+t.w+'×'+t.h)+'</div>';
+    trackWrong(3);fb.className='fb no';fb.innerHTML='לא מדויק 💪<div class="fb-sub">נדרש: '+(t.shape==='sq'?'ריבוע '+t.s+'×'+t.s:'מלבן '+t.w+'×'+t.h)+'</div>';
   }
 }
 
@@ -806,7 +1008,7 @@ function goTo(idx){
 }
 
 // ── SPLASH → APP ──
-function startApp(){
+async function startApp(){
   boom(60);
   const splash=document.getElementById('splash');
   const app=document.getElementById('app');
@@ -815,7 +1017,7 @@ function startApp(){
   setTimeout(()=>{
     splash.classList.add('splash-hidden');
     app.classList.add('show');
-    genRect();genFrame();genTri();genMissing();
+    loadStats();genRect();genFrame();genTri();genMissing();
     setTimeout(initDraw,80);
   },500);
 }
@@ -859,7 +1061,7 @@ function pickBonus(btn,v,correct){
     bdone=true;clearInterval(btimer);
     btn.classList.add('ok');lockMCQ('bmc');
     boom(120);
-    addScore(5);
+    addScore(5);saveStats();
     showFb('bfb','ok',WINS[rnd(0,WINS.length-1)],'+5 דקות מסך נוספו! 📺');
     document.getElementById('bcl').style.display='block';
   } else {
