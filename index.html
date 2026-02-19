@@ -683,19 +683,19 @@ let stats={
   wrong:   [0,0,0,0,0],   // per section
   sessions: []
 };
+const FB='https://ori-geo-default-rtdb.firebaseio.com';
 async function loadStats(){
   try{
-    const r=await window.storage.get('ori:stats');
-    if(r&&r.value){
-      const s=JSON.parse(r.value);
+    const r=await fetch(FB+'/ori/stats.json');
+    if(r.ok){const s=await r.json();
       if(s){stats.totalMinutes=s.totalMinutes||0;stats.correct=s.correct||[0,0,0,0,0];stats.wrong=s.wrong||[0,0,0,0,0];stats.sessions=s.sessions||[];stats.screenMinutes=s.screenMinutes||0;}
       totalScore=stats.totalMinutes;
       document.getElementById('scoreBox').textContent='📺 '+totalScore+' דק׳';
     }
   }catch(e){}
   try{
-    const rd=await window.storage.get('ori:difficulty');
-    if(rd&&rd.value)window._oriDifficulty=parseInt(rd.value)||5;
+    const r=await fetch(FB+'/ori/difficulty.json');
+    if(r.ok){const d=await r.json();if(d)window._oriDifficulty=parseInt(d)||5;}
   }catch(e){}
 }
 let _saveTimer=null;
@@ -703,7 +703,7 @@ function saveStats(){
   stats.totalMinutes=totalScore;
   clearTimeout(_saveTimer);
   _saveTimer=setTimeout(async()=>{
-    try{await window.storage.set('ori:stats',JSON.stringify(stats));}catch(e){}
+    try{await fetch(FB+'/ori/stats.json',{method:'PUT',body:JSON.stringify(stats)});}catch(e){}
   },1500);
 }
 function trackScreen(min){stats.screenMinutes=(stats.screenMinutes||0)+min;saveStats();}
@@ -1034,7 +1034,7 @@ async function startApp(){
   setTimeout(()=>{
     splash.classList.add('splash-hidden');
     app.classList.add('show');
-    loadStats();genRect();genFrame();genTri();genMissing();
+    await loadStats();genRect();genFrame();genTri();genMissing();
     setTimeout(initDraw,80);
   },500);
 }
