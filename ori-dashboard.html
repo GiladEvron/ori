@@ -217,12 +217,20 @@ async function renderStats(){
   document.getElementById('resetBlock').innerHTML=`
     <div class="reset-card">
       <div class="reset-label">אורי צבר <span>${d.screenMinutes||0} דקות מסך</span> עד כה</div>
-      <button class="btn-reset" onclick="resetMinutes()">🔄 &nbsp;איפוס דקות מסך</button>
+      <button class="btn-reset" onclick="resetMinutes()">🔄 &nbsp;איפוס דקות מסך בלבד</button>
+      <button class="btn-reset" style="margin-top:10px;border-color:#FF8C00;color:#FF8C00;" onclick="resetAll()">⚠️ &nbsp;איפוס כל הנתונים</button>
     </div>`;
 
   document.getElementById('lastUpdate').textContent='עודכן: '+new Date().toLocaleTimeString('he-IL');
 }
 
+async function resetAll(){
+  if(!confirm('לאפס את כל הנתונים של אורי לגמרי? (דקות, תשובות, הכל)'))return;
+  try{await window.storage.delete('ori:stats');}catch(e){}
+  try{await window.storage.delete('ori:difficulty');}catch(e){}
+  alert('✅ כל הנתונים אופסו!');
+  renderStats();
+}
 async function resetMinutes(){
   if(!confirm('לאפס את דקות המסך של אורי?'))return;
   try{
