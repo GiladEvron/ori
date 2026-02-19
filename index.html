@@ -772,9 +772,15 @@ function autoRotate(currentSec){
   const others=[0,1,2,3,4].filter(i=>i!==currentSec);
   const next=others[rnd(0,others.length-1)];
   goTo(next);
+  // generate new question in new section
+  if(next===0)genRect();
+  else if(next===1)genFrame();
+  else if(next===2)genTri();
+  else if(next===3)newDraw();
+  else if(next===4)genMissing();
   // flash notification
   const notif=document.createElement('div');
-  notif.style.cssText='position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;background:#FFD600;color:#07090F;font-family:Heebo,sans-serif;font-weight:900;font-size:18px;padding:12px 24px;border-radius:10px;box-shadow:0 0 20px rgba(255,214,0,.5);animation:fadeUp .4s ease';
+  notif.style.cssText='position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;background:#FFD600;color:#07090F;font-family:Heebo,sans-serif;font-weight:900;font-size:18px;padding:12px 24px;border-radius:10px;box-shadow:0 0 20px rgba(255,214,0,.5)';
   notif.textContent='🔀 עוברים לנושא חדש!';
   document.body.appendChild(notif);
   setTimeout(()=>notif.remove(),2000);
