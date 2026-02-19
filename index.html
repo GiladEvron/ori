@@ -1031,7 +1031,7 @@ async function startApp(){
   const app=document.getElementById('app');
   splash.style.transition='opacity .5s';
   splash.style.opacity='0';
-  setTimeout(()=>{
+  setTimeout(async()=>{
     splash.classList.add('splash-hidden');
     app.classList.add('show');
     await loadStats();genRect();genFrame();genTri();genMissing();
