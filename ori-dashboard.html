@@ -234,10 +234,11 @@ async function renderStats(){
 async function resetAll(){
   if(!confirm('לאפס את כל הנתונים של אורי לגמרי? (דקות, תשובות, הכל)'))return;
   try{
-    await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori.json',{method:'DELETE'});
+    const empty={totalMinutes:0,screenMinutes:0,correct:[0,0,0,0,0],wrong:[0,0,0,0,0],sessions:[]};
+    await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json',{method:'PUT',body:JSON.stringify(empty)});
   }catch(e){}
   alert('✅ כל הנתונים אופסו!');
-  renderStats();
+  await renderStats();
 }
 async function resetMinutes(){
   if(!confirm('לאפס את דקות המסך של אורי?'))return;
