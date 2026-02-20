@@ -710,9 +710,19 @@ function saveStats(){
     try{await fetch(FB+'/ori/stats.json',{method:'PUT',body:JSON.stringify(stats)});}catch(e){}
   },1500);
 }
-function trackScreen(min){stats.screenMinutes=(stats.screenMinutes||0)+min;saveStats();}
-function trackCorrect(sec){stats.correct[sec]=(stats.correct[sec]||0)+1;saveStats();}
-function trackWrong(sec){stats.wrong[sec]=(stats.wrong[sec]||0)+1;saveStats();}
+function trackScreen(min){stats.screenMinutes=(stats.screenMinutes||0)+min;}
+function trackCorrect(sec){
+  stats.correct[sec]=(stats.correct[sec]||0)+1;
+  try{
+    fetch(FB+'/ori/stats/correct/'+sec+'.json',{method:'PUT',body:JSON.stringify(stats.correct[sec])});
+  }catch(e){}
+}
+function trackWrong(sec){
+  stats.wrong[sec]=(stats.wrong[sec]||0)+1;
+  try{
+    fetch(FB+'/ori/stats/wrong/'+sec+'.json',{method:'PUT',body:JSON.stringify(stats.wrong[sec])});
+  }catch(e){}
+}
 function trackTime(){
   const mins=Math.round((Date.now()-stats.sessionStart)/60000);
   if(mins>0){
@@ -720,11 +730,10 @@ function trackTime(){
     // keep last 30 sessions only
     if(stats.sessions.length>30)stats.sessions=stats.sessions.slice(-30);
   }
-  saveStats();
 }
 // save session time every minute
 setInterval(()=>{trackTime();},60000);
-// sync score from Firebase every 10 seconds (catches resets from dashboard)
+// poll Firebase every 5 seconds - dashboard is the source of truth
 setInterval(async()=>{
   try{
     const r=await fetch(FB+'/ori/stats.json?t='+Date.now());
@@ -732,23 +741,32 @@ setInterval(async()=>{
       const s=await r.json();
       if(s && s.totalMinutes!==undefined && s.totalMinutes!==totalScore){
         totalScore=s.totalMinutes;
-        stats.totalMinutes=s.totalMinutes;
         document.getElementById('scoreBox').textContent='📺 '+totalScore+' דק׳';
       }
     }
   }catch(e){}
-},10000);
+},5000);
 window.addEventListener('beforeunload',trackTime);
 
-function addScore(min){
+async function addScore(min){
   totalScore+=min;
-  stats.totalMinutes+=min;
-  trackScreen(min);
   document.getElementById('scoreBox').textContent='📺 '+totalScore+' דק׳';
-  // flash
   const sb=document.getElementById('scoreBox');
   sb.style.boxShadow='0 0 22px rgba(255,214,0,.8)';
   setTimeout(()=>sb.style.boxShadow='0 0 10px rgba(255,214,0,.3)',600);
+  // increment in Firebase
+  try{
+    const r=await fetch(FB+'/ori/stats.json?t='+Date.now());
+    if(r.ok){
+      const s=await r.json()||{};
+      s.totalMinutes=(s.totalMinutes||0)+min;
+      s.screenMinutes=(s.screenMinutes||0)+min;
+      s.correct=s.correct||[0,0,0,0,0];
+      s.wrong=s.wrong||[0,0,0,0,0];
+      s.sessions=s.sessions||[];
+      await fetch(FB+'/ori/stats.json',{method:'PUT',body:JSON.stringify(s)});
+    }
+  }catch(e){}
 }
 function incStreak(){
   bonusStreak++;
@@ -1125,7 +1143,7 @@ function pickBonus(btn,v,correct){
     bdone=true;clearInterval(btimer);
     btn.classList.add('ok');lockMCQ('bmc');
     boom(120);
-    addScore(5);saveStats();
+    addScore(5);
     showFb('bfb','ok',WINS[rnd(0,WINS.length-1)],'+5 דקות מסך נוספו! 📺');
     document.getElementById('bcl').style.display='block';
   } else {
