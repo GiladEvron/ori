@@ -724,6 +724,20 @@ function trackTime(){
 }
 // save session time every minute
 setInterval(()=>{trackTime();},60000);
+// sync score from Firebase every 10 seconds (catches resets from dashboard)
+setInterval(async()=>{
+  try{
+    const r=await fetch(FB+'/ori/stats.json?t='+Date.now());
+    if(r.ok){
+      const s=await r.json();
+      if(s && s.totalMinutes!==undefined && s.totalMinutes!==totalScore){
+        totalScore=s.totalMinutes;
+        stats.totalMinutes=s.totalMinutes;
+        document.getElementById('scoreBox').textContent='📺 '+totalScore+' דק׳';
+      }
+    }
+  }catch(e){}
+},10000);
 window.addEventListener('beforeunload',trackTime);
 
 function addScore(min){
