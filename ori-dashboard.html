@@ -201,7 +201,7 @@ async function renderStats(){
     ${isDemo?'<div class="demo-bar">👁️ מצב דמו — נתונים לדוגמה</div>':''}
     <div class="cards-grid">
       <div class="card cyan"><span class="card-icon">⏱️</span><div class="card-label">זמן באפליקציה</div><div class="card-val big">${fmtTime(d.totalTime||0)}</div><div class="card-sub">מצטבר</div></div>
-      <div class="card gold"><span class="card-icon">📺</span><div class="card-label">דקות מסך שנצברו</div><div class="card-val big">${d.screenMinutes||0}</div><div class="card-sub">דקות</div></div>
+      <div class="card gold"><span class="card-icon">📺</span><div class="card-label">דקות מסך שנצברו</div><div class="card-val big">${d.totalMinutes||0}</div><div class="card-sub">דקות</div></div>
       <div class="card green"><span class="card-icon">✅</span><div class="card-label">תשובות נכונות</div><div class="card-val big" style="color:${col(pct)}">${pct}%</div><div class="card-sub">${tc} מתוך ${tq} שאלות</div></div>
       <div class="card red"><span class="card-icon">⚠️</span><div class="card-label">הכי קשה לאורי</div><div class="card-val small">${wi>=0?SEC_NAMES[wi]:'—'}</div><div class="card-sub">${wi>=0?Math.round(wr*100)+'% שגיאות':''}</div></div>
     </div>
@@ -223,7 +223,7 @@ async function renderStats(){
 
   document.getElementById('resetBlock').innerHTML=`
     <div class="reset-card">
-      <div class="reset-label">אורי צבר <span>${d.screenMinutes||0} דקות מסך</span> עד כה</div>
+      <div class="reset-label">אורי צבר <span>${d.totalMinutes||0} דקות מסך</span> עד כה</div>
       <button class="btn-reset" onclick="resetMinutes()">🔄 &nbsp;איפוס דקות מסך בלבד</button>
       <button class="btn-reset" style="margin-top:10px;border-color:#FF8C00;color:#FF8C00;" onclick="resetAll()">⚠️ &nbsp;איפוס כל הנתונים</button>
     </div>`;
