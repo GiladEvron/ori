@@ -677,21 +677,7 @@ function buildMCQ(id,correct,onPick,type){
   });
 }
 function lockMCQ(id){document.querySelectorAll('#'+id+' .mb').forEach(b=>{b.disabled=true;b.style.pointerEvents='none';});}
-function showFb(id,cls,msg,sub){
-  // update inline element (for bonus etc)
-  const el=document.getElementById(id);
-  el.className='fb '+cls;
-  el.innerHTML=msg+(sub?`<div class="fb-sub">${sub}</div>`:'');
-  // show centered flash overlay
-  let ov=document.getElementById('fbOverlay');
-  if(!ov){ov=document.createElement('div');ov.id='fbOverlay';
-    ov.style.cssText='position:fixed;inset:0;z-index:8500;display:flex;align-items:center;justify-content:center;pointer-events:none;';
-    document.body.appendChild(ov);}
-  const bg=cls==='ok'?'#00FF85':cls==='no'?'#FF1F6E':'#FFD600';
-  const tc=cls==='ok'?'#07090F':cls==='no'?'#fff':'#07090F';
-  ov.innerHTML=`<div style="background:${bg};color:${tc};font-family:Heebo,sans-serif;font-weight:900;font-size:22px;padding:20px 36px;border-radius:16px;text-align:center;box-shadow:0 0 40px ${bg}99;animation:fadeUp .3s ease">${msg}${sub?`<div style="font-size:15px;opacity:.85;margin-top:6px">${sub}</div>`:''}</div>`;
-  clearTimeout(ov._t);ov._t=setTimeout(()=>{ov.innerHTML='';},1800);
-}
+function showFb(id,cls,msg,sub){const el=document.getElementById(id);el.className='fb '+cls;el.innerHTML=msg+(sub?`<div class="fb-sub">${sub}</div>`:'');setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'center'}),50);}
 
 // ── SCORING ──
 let totalScore=0;
