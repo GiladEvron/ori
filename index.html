@@ -786,7 +786,7 @@ function rotateRandom(fromSec){
 }
 
 // ── SECTION STATE ──
-const isDone={0:false,1:false,2:false,4:false};
+const isDone={0:false,1:false,2:false,3:false,4:false};
 function pick(sec,btn,v,correct){
   if(isDone[sec])return;
   if(v===correct){
@@ -1067,7 +1067,7 @@ async function startApp(){
   setTimeout(async()=>{
     splash.classList.add('splash-hidden');
     app.classList.add('show');
-    await loadStats();genRect();genFrame();genTri();genMissing();const startSec=rnd(0,4);goTo(startSec);
+    await loadStats();genRect();genFrame();genTri();genMissing();goTo(0);
     setTimeout(initDraw,80);
   },500);
 }
