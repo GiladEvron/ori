@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
-<title>גיאומטריה עם אורי — דמו</title>
+<title>גיאומטריה עם אורי</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Heebo:wght@900&display=swap" rel="stylesheet"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -291,7 +291,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
     <div class="splash-title-block">
       <div class="splash-icon">📐</div>
       <div class="splash-heading">גיאומטריה עם אורי</div>
-      <div class="splash-subtitle">גרסת דמו 🎮</div>
+      <div class="splash-subtitle">הוראות למשחק</div>
     </div>
 
     <!-- topics -->
@@ -342,7 +342,6 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 <div class="wrap">
 
 <!-- HEADER -->
-<div style="background:rgba(255,214,0,.1);border:1.5px solid rgba(255,214,0,.4);border-radius:8px;padding:8px 14px;margin-bottom:12px;text-align:center;font-size:15px;font-weight:900;color:#FFD600;">🎮 גרסת דמו — הנתונים לא נשמרים</div>
 <div class="hbar">
   <div class="htitle">GEO · אורי</div>
   <div class="score-row">
@@ -696,16 +695,28 @@ let stats={
   wrong:   [0,0,0,0,0],   // per section
   sessions: []
 };
-// ══ DEMO MODE — no Firebase ══
+const FB='https://ori-geo-default-rtdb.firebaseio.com';
 async function loadStats(){
-  totalScore=0;
-  document.getElementById('scoreBox').textContent='📺 '+totalScore+' דק׳';
-  window._oriDifficulty=5;
+  try{
+    const r=await fetch(FB+'/ori/stats.json');
+    if(r.ok){const s=await r.json();
+      if(s){stats.totalMinutes=s.totalMinutes||0;stats.correct=s.correct||[0,0,0,0,0];stats.wrong=s.wrong||[0,0,0,0,0];stats.sessions=s.sessions||[];stats.screenMinutes=s.screenMinutes||0;}
+      totalScore=stats.totalMinutes;
+      document.getElementById('scoreBox').textContent='📺 '+totalScore+' דק׳';
+    }
+  }catch(e){}
+  try{
+    const r=await fetch(FB+'/ori/difficulty.json');
+    if(r.ok){const d=await r.json();if(d)window._oriDifficulty=parseInt(d)||5;}
+  }catch(e){}
 }
 let _saveTimer=null;
 function saveStats(){
   stats.totalMinutes=totalScore;
-  // demo — no Firebase save
+  clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(async()=>{
+    try{await fetch(FB+'/ori/stats.json',{method:'PUT',body:JSON.stringify(stats)});}catch(e){}
+  },1500);
 }
 function trackScreen(min){stats.screenMinutes=(stats.screenMinutes||0)+min;}
 function trackCorrect(sec){
@@ -724,7 +735,22 @@ function trackTime(){
 }
 // save session time every minute
 setInterval(()=>{trackTime();},60000);
-// demo — no Firebase polling
+// poll Firebase every 5 seconds - dashboard is the source of truth
+setInterval(async()=>{
+  try{
+    const r=await fetch(FB+'/ori/stats.json?t='+Date.now());
+    if(r.ok){
+      const s=await r.json();
+      if(s && s.totalMinutes!==undefined && s.totalMinutes!==totalScore){
+        totalScore=s.totalMinutes;
+        // sync local stats too (catches resets)
+        if(s.correct && Array.isArray(s.correct)) stats.correct=s.correct;
+        if(s.wrong && Array.isArray(s.wrong)) stats.wrong=s.wrong;
+        document.getElementById('scoreBox').textContent='📺 '+totalScore+' דק׳';
+      }
+    }
+  }catch(e){}
+},5000);
 window.addEventListener('beforeunload',trackTime);
 
 function addScore(min){
@@ -733,7 +759,22 @@ function addScore(min){
   const sb=document.getElementById('scoreBox');
   sb.style.boxShadow='0 0 22px rgba(255,214,0,.8)';
   setTimeout(()=>sb.style.boxShadow='0 0 10px rgba(255,214,0,.3)',600);
-  // demo — no Firebase save
+  // increment in Firebase (background)
+  (async()=>{
+    try{
+      const r=await fetch(FB+'/ori/stats.json?t='+Date.now());
+      if(r.ok){
+        const s=await r.json()||{};
+        s.totalMinutes=(s.totalMinutes||0)+min;
+        s.screenMinutes=(s.screenMinutes||0)+min;
+        // save correct/wrong from local stats
+        s.correct=stats.correct||[0,0,0,0,0];
+        s.wrong=stats.wrong||[0,0,0,0,0];
+        s.sessions=s.sessions||[];
+        await fetch(FB+'/ori/stats.json',{method:'PUT',body:JSON.stringify(s)});
+      }
+    }catch(e){}
+  })();
 }
 function incStreak(){
   bonusStreak++;

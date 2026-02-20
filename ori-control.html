@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>דשבורד הורים — אורי (דמו)</title>
+<title>דשבורד הורים — אורי</title>
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -99,9 +99,9 @@ input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;bac
 <div class="page">
 
   <div class="header">
-    <div class="header-badge">🎮 גרסת דמו</div>
+    <div class="header-badge">🔒 הורים בלבד</div>
     <h1>דשבורד <span>אורי</span></h1>
-    <div class="header-sub">גיאומטריה · נתונים לדוגמה</div>
+    <div class="header-sub">גיאומטריה · מעקב ביצועים</div>
   </div>
 
   <div id="content"></div>
@@ -164,7 +164,14 @@ function updateKnob(v){
 
 async function saveDifficulty(){
   const v=parseInt(document.getElementById('diffSlider').value);
-  document.getElementById('diffSaved').textContent='🎮 דמו — רמה '+v+' (לא נשמר באמת)';
+  try{
+    await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/difficulty.json',{method:'PUT',body:JSON.stringify(v)});
+    const r=await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json?t='+Date.now());
+    const d=r.ok&&await r.json()||{correct:[0,0,0,0,0],wrong:[0,0,0,0,0],screenMinutes:0,totalTime:0};
+    d.difficulty=v;
+    await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json',{method:'PUT',body:JSON.stringify(d)});
+  }catch(e){}
+  document.getElementById('diffSaved').textContent='✅ נשמר! אורי יקבל שאלות ברמה '+v;
   setTimeout(()=>{document.getElementById('diffSaved').textContent='';},3000);
 }
 
@@ -172,15 +179,26 @@ async function saveDifficulty(){
 // difficulty loaded in init below
 
 async function renderStats(){
-  const d={totalTime:2340,totalMinutes:23,correct:[18,12,9,14,7],wrong:[3,8,5,2,9],screenMinutes:23};
-  const correct=d.correct,wrong=d.wrong;
+  let d,isDemo;
+  try{
+    const r=await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json?t='+Date.now(),{method:'GET',headers:{'Accept':'application/json'}});
+    const raw=await r.json();
+    if(raw && typeof raw==='object' && raw.wrong!==undefined){
+      // Firebase converts arrays to objects - convert back
+      if(raw.correct && !Array.isArray(raw.correct)) raw.correct=Object.values(raw.correct);
+      if(raw.wrong && !Array.isArray(raw.wrong)) raw.wrong=Object.values(raw.wrong);
+      d=raw;isDemo=false;
+    }
+    else{d={totalTime:2340,correct:[18,12,9,14,7],wrong:[3,8,5,2,9],screenMinutes:23};isDemo=true;}
+  }catch(e){d={totalTime:2340,correct:[18,12,9,14,7],wrong:[3,8,5,2,9],screenMinutes:23};isDemo=true;}
+  const correct=d.correct||[0,0,0,0,0],wrong=d.wrong||[0,0,0,0,0];
   const tc=correct.reduce((a,b)=>a+b,0),tw=wrong.reduce((a,b)=>a+b,0),tq=tc+tw;
   const pct=tq>0?Math.round(tc/tq*100):0;
   let wi=-1,wr=-1;
   for(let i=0;i<5;i++){const t=correct[i]+wrong[i];if(t>=3){const r=wrong[i]/t;if(r>wr){wr=r;wi=i;}}}
 
   document.getElementById('content').innerHTML=`
-    ${'<div class="demo-bar">🎮 גרסת דמו — נתונים לדוגמה בלבד</div>'}
+    ${isDemo?'<div class="demo-bar">👁️ מצב דמו — נתונים לדוגמה</div>':''}
     <div class="cards-grid">
       <div class="card cyan"><span class="card-icon">⏱️</span><div class="card-label">זמן באפליקציה</div><div class="card-val big">${fmtTime(d.totalTime||0)}</div><div class="card-sub">מצטבר</div></div>
       <div class="card gold"><span class="card-icon">📺</span><div class="card-label">דקות מסך שנצברו</div><div class="card-val big">${d.totalMinutes||0}</div><div class="card-sub">דקות</div></div>
@@ -214,16 +232,30 @@ async function renderStats(){
 }
 
 async function resetAll(){
-  alert('🎮 דמו — איפוס לא זמין בגרסה זו');
+  if(!confirm('לאפס את כל הנתונים של אורי לגמרי? (דקות, תשובות, הכל)'))return;
+  try{
+    const empty={totalMinutes:0,screenMinutes:0,correct:[0,0,0,0,0],wrong:[0,0,0,0,0],sessions:[]};
+    await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json',{method:'PUT',body:JSON.stringify(empty)});
+  }catch(e){}
+  alert('✅ כל הנתונים אופסו!');
+  await renderStats();
 }
 async function resetMinutes(){
-  alert('🎮 דמו — איפוס לא זמין בגרסה זו');
+  if(!confirm('לאפס את דקות המסך של אורי?'))return;
+  try{
+    const r=await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json?t='+Date.now());
+    if(r.ok){const d=await r.json();if(d){d.screenMinutes=0;d.totalMinutes=0;await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json',{method:'PUT',body:JSON.stringify(d)});}}
+  }catch(e){}
+  await renderStats();
 }
 
 (async()=>{
-  document.getElementById('diffSlider').value=5;
-  updateKnob(5);
+  let savedDiff=5;
+  try{const r=await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/difficulty.json');if(r.ok){const d=await r.json();if(d)savedDiff=parseInt(d)||5;}}catch(e){}
+  document.getElementById('diffSlider').value=savedDiff;
+  updateKnob(savedDiff);
   await renderStats();
+  setInterval(renderStats,30000);
 })();
 </script>
 </body>
