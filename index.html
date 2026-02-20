@@ -1152,16 +1152,17 @@ function pickBonus(btn,v,correct){
     btn.classList.add('ok');lockMCQ('bmc');
     boom(120);
     addScore(5);
-    showFb('bfb','ok',WINS[rnd(0,WINS.length-1)],'+5 דקות מסך נוספו! 📺');
-    document.getElementById('bcl').style.display='block';
+    // הצג הודעה פשוטה ואז סגור אוטומטית
+    const el=document.getElementById('bfb');
+    el.className='fb ok';
+    el.innerHTML=WINS[rnd(0,WINS.length-1)]+'<div class="fb-sub">+5 דקות מסך נוספו! 📺</div>';
+    setTimeout(()=>closeBonus(),2000);
   } else {
     btn.classList.add('no');
-    if(elapsed<=3){
-      showFb('bfb','wn','⚠️ לא לנחש!','תסתכל על השאלה ותחשוב...');
-    } else {
-      showFb('bfb','no','התשובה לא נכונה 💪','תתרכז ותנסה שוב!');
-    }
-    setTimeout(()=>{btn.classList.remove('no');document.getElementById('bfb').className='fb';},2000);
+    const el=document.getElementById('bfb');
+    el.className='fb no';
+    el.innerHTML=(elapsed<=3?'⚠️ לא לנחש!<div class="fb-sub">תסתכל על השאלה ותחשוב...</div>':'התשובה לא נכונה 💪<div class="fb-sub">תתרכז ותנסה שוב!</div>');
+    setTimeout(()=>{btn.classList.remove('no');el.className='fb';},2000);
   }
 }
 
@@ -1204,7 +1205,11 @@ function bonusTimeout(){
 
 function closeBonus(){
   clearInterval(btimer);
+  bdone=false;
   document.getElementById('bov').classList.add('hidden');
+  document.getElementById('bfb').className='fb';
+  // המשך מהנושא הנוכחי
+  nextQuestion(currentSec);
 }
 </script>
 </body>
