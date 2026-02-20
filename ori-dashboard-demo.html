@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>דשבורד הורים — אורי (דמו)</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#07090F;color:#D8EEFF;font-family:'Heebo',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.04) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+.page{position:relative;z-index:1;max-width:520px;margin:0 auto;padding:28px 18px 60px;}
+
+.header{text-align:center;margin-bottom:36px;}
+.header-badge{display:inline-block;background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.2);border-radius:20px;padding:7px 20px;font-size:15px;color:#00E5FF;letter-spacing:2px;margin-bottom:14px;font-weight:700;}
+.header h1{font-family:'Orbitron',monospace;font-size:28px;font-weight:900;color:#fff;margin-bottom:6px;}
+.header h1 span{color:#00E5FF;}
+.header-sub{font-size:17px;color:rgba(216,238,255,.4);}
+
+.demo-bar{background:rgba(255,214,0,.08);border:1px solid rgba(255,214,0,.2);border-radius:8px;padding:10px 16px;margin-bottom:22px;font-size:15px;color:#FFD600;text-align:center;font-weight:700;}
+
+/* stat cards */
+.cards-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+.card{background:#0D1221;border:1.5px solid rgba(255,255,255,.07);border-radius:18px;padding:22px 16px 20px;text-align:center;position:relative;overflow:hidden;animation:fadeUp .4s ease both;}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:18px 18px 0 0;}
+.card.cyan::before{background:linear-gradient(90deg,transparent,#00E5FF,transparent);}
+.card.gold::before{background:linear-gradient(90deg,transparent,#FFD600,transparent);}
+.card.green::before{background:linear-gradient(90deg,transparent,#00FF85,transparent);}
+.card.red::before{background:linear-gradient(90deg,transparent,#FF1F6E,transparent);}
+.card-icon{font-size:30px;margin-bottom:10px;display:block;}
+.card-label{font-size:14px;font-weight:700;color:rgba(216,238,255,.5);margin-bottom:8px;}
+.card-val{font-family:'Orbitron',monospace;font-weight:900;line-height:1;}
+.card.cyan .card-val{color:#00E5FF;}
+.card.gold .card-val{color:#FFD600;}
+.card.green .card-val{color:#00FF85;}
+.card.red .card-val{color:#FF1F6E;}
+.card-val.big{font-size:38px;}
+.card-val.small{font-size:18px;font-family:'Heebo';line-height:1.35;font-weight:900;}
+.card-sub{font-size:13px;color:rgba(216,238,255,.35);margin-top:6px;}
+
+/* section title */
+.section-head{font-size:15px;font-weight:900;color:rgba(216,238,255,.5);letter-spacing:2px;margin:28px 0 14px;display:flex;align-items:center;gap:10px;}
+.section-head::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.07);}
+
+/* topics */
+.topic{background:#0D1221;border:1.5px solid rgba(255,255,255,.07);border-radius:14px;padding:16px 18px;margin-bottom:10px;display:grid;grid-template-columns:32px 1fr auto;align-items:center;gap:12px;animation:fadeUp .4s ease both;}
+.topic.worst{border-color:rgba(255,31,110,.3);background:linear-gradient(135deg,#0D1221,rgba(255,31,110,.05));}
+.topic-icon{font-size:22px;text-align:center;}
+.topic-name{font-size:17px;font-weight:900;margin-bottom:6px;display:flex;align-items:center;gap:8px;}
+.worst-tag{font-size:11px;background:#FF1F6E;color:#fff;border-radius:4px;padding:2px 7px;font-weight:900;}
+.topic-bar-bg{height:7px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden;}
+.topic-bar-fill{height:100%;border-radius:4px;transition:width 1s ease;}
+.topic-pct{font-family:'Orbitron',monospace;font-size:20px;font-weight:900;}
+.topic-count{font-size:13px;color:rgba(216,238,255,.35);margin-top:3px;text-align:center;}
+
+/* ── DIFFICULTY KNOB ── */
+.diff-card{background:#0D1221;border:1.5px solid rgba(185,79,255,.3);border-radius:18px;padding:24px 20px 28px;text-align:center;margin-bottom:14px;}
+.diff-title{font-size:20px;font-weight:900;color:#D8EEFF;margin-bottom:4px;}
+.diff-sub{font-size:14px;color:rgba(216,238,255,.4);margin-bottom:24px;}
+
+.knob-wrap{position:relative;width:160px;height:160px;margin:0 auto 20px;}
+.knob-wrap svg{width:100%;height:100%;}
+.knob-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.knob-val{font-family:'Orbitron',monospace;font-size:36px;font-weight:900;color:#B94FFF;line-height:1;}
+.knob-of{font-size:14px;color:rgba(216,238,255,.35);margin-top:2px;}
+
+input[type=range]{
+  -webkit-appearance:none;appearance:none;
+  width:100%;height:10px;
+  background:linear-gradient(90deg,#B94FFF var(--p,50%),rgba(255,255,255,.1) var(--p,50%));
+  border-radius:5px;outline:none;cursor:pointer;margin-bottom:12px;
+}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;border-radius:50%;background:#B94FFF;border:3px solid #07090F;box-shadow:0 0 12px #B94FFF88;cursor:pointer;}
+input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;background:#B94FFF;border:3px solid #07090F;box-shadow:0 0 12px #B94FFF88;cursor:pointer;}
+
+.diff-levels{display:flex;justify-content:space-between;font-size:13px;color:rgba(216,238,255,.35);padding:0 4px;}
+.diff-desc{font-size:16px;font-weight:900;color:#B94FFF;margin-top:8px;min-height:24px;}
+.btn-save-diff{background:#B94FFF;border:none;color:#fff;font-family:'Heebo';font-size:17px;font-weight:900;padding:14px 32px;border-radius:12px;cursor:pointer;width:100%;margin-top:20px;transition:.2s;}
+.btn-save-diff:hover{background:#a030f0;}
+.btn-save-diff:active{transform:scale(.97);}
+.diff-saved{font-size:14px;color:#00FF85;margin-top:10px;min-height:20px;font-weight:700;}
+
+/* reset */
+.reset-card{background:#0D1221;border:1.5px solid rgba(255,31,110,.2);border-radius:18px;padding:24px 20px;text-align:center;}
+.reset-label{font-size:17px;color:rgba(216,238,255,.5);margin-bottom:16px;line-height:1.5;}
+.reset-label span{color:#FFD600;font-weight:900;}
+.btn-reset{background:transparent;border:2px solid #FF1F6E;color:#FF1F6E;font-family:'Heebo';font-size:18px;font-weight:900;padding:14px 28px;border-radius:12px;cursor:pointer;width:100%;transition:.2s;display:flex;align-items:center;justify-content:center;gap:8px;}
+.btn-reset:hover{background:rgba(255,31,110,.1);}
+
+.refresh-row{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:20px;}
+.btn-refresh{background:transparent;border:1px solid rgba(0,229,255,.2);color:rgba(0,229,255,.6);font-family:'Heebo';font-size:15px;font-weight:700;padding:8px 22px;border-radius:10px;cursor:pointer;}
+.last-update{font-size:13px;color:rgba(216,238,255,.25);}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+.card:nth-child(1){animation-delay:.05s;}.card:nth-child(2){animation-delay:.1s;}.card:nth-child(3){animation-delay:.15s;}.card:nth-child(4){animation-delay:.2s;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <div class="header-badge">🎮 גרסת דמו</div>
+    <h1>דשבורד <span>אורי</span></h1>
+    <div class="header-sub">גיאומטריה · נתונים לדוגמה</div>
+  </div>
+
+  <div id="content"></div>
+
+  <!-- DIFFICULTY KNOB -->
+  <div class="section-head">🎚️ רמת קושי</div>
+  <div class="diff-card">
+    <div class="diff-title">שליטה ברמת הקושי</div>
+    <div class="diff-sub">גרור כדי לשנות את קושי השאלות לאורי</div>
+
+    <div class="knob-wrap">
+      <svg viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="80" cy="80" r="66" fill="none" stroke="rgba(185,79,255,.12)" stroke-width="14"/>
+        <circle id="arcFill" cx="80" cy="80" r="66" fill="none" stroke="#B94FFF" stroke-width="14"
+          stroke-linecap="round" stroke-dasharray="0 415"
+          transform="rotate(-90 80 80)" filter="url(#glow)"/>
+        <defs><filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+      </svg>
+      <div class="knob-label">
+        <div class="knob-val" id="knobVal">5</div>
+        <div class="knob-of">מתוך 10</div>
+      </div>
+    </div>
+
+    <input type="range" id="diffSlider" min="1" max="10" value="5" oninput="updateKnob(this.value)">
+    <div class="diff-levels"><span>קל</span><span>בינוני</span><span>קשה</span></div>
+    <div class="diff-desc" id="diffDesc">בינוני</div>
+    <button class="btn-save-diff" onclick="saveDifficulty()">✅ &nbsp;שמור רמת קושי</button>
+    <div class="diff-saved" id="diffSaved"></div>
+  </div>
+
+  <div class="section-head">🔄 איפוס</div>
+  <div id="resetBlock"></div>
+
+  <div class="refresh-row">
+    <button class="btn-refresh" onclick="renderStats()">↻ רענן נתונים</button>
+    <span class="last-update" id="lastUpdate"></span>
+  </div>
+
+</div>
+<script>
+const SEC_NAMES=['מלבן וריבוע','צורות מורכבות','משולש','שרטוט','צלע חסרה'];
+const SEC_ICONS=['📐','🖼️','△','✏️','🔍'];
+const DIFF_LABELS={1:'קל מאוד',2:'קל',3:'קל-בינוני',4:'מתחת לבינוני',5:'בינוני',6:'מעל בינוני',7:'קשה',8:'קשה מאוד',9:'מאתגר',10:'אלוף!'};
+
+function fmtTime(sec){if(!sec||sec<60)return(sec||0)+'ש׳';const m=Math.floor(sec/60),s=sec%60;if(m<60)return m+' דק׳ '+s+'ש׳';const h=Math.floor(m/60),rm=m%60;return h+'ש׳ '+rm+' דק׳';}
+function col(p){if(p===null)return'#555';if(p>=70)return'#00FF85';if(p>=45)return'#FFD600';return'#FF1F6E';}
+
+// knob
+function updateKnob(v){
+  v=parseInt(v);
+  const circ=2*Math.PI*66;
+  const fill=circ*(v/10);
+  document.getElementById('arcFill').setAttribute('stroke-dasharray',fill+' '+(circ-fill));
+  document.getElementById('knobVal').textContent=v;
+  document.getElementById('diffDesc').textContent=DIFF_LABELS[v]||'';
+  const pct=((v-1)/9*100).toFixed(0);
+  document.getElementById('diffSlider').style.setProperty('--p',pct+'%');
+}
+
+async function saveDifficulty(){
+  const v=parseInt(document.getElementById('diffSlider').value);
+  document.getElementById('diffSaved').textContent='🎮 דמו — רמה '+v+' (לא נשמר באמת)';
+  setTimeout(()=>{document.getElementById('diffSaved').textContent='';},3000);
+}
+
+// load saved difficulty
+// difficulty loaded in init below
+
+async function renderStats(){
+  const d={totalTime:2340,totalMinutes:23,correct:[18,12,9,14,7],wrong:[3,8,5,2,9],screenMinutes:23};
+  const correct=d.correct,wrong=d.wrong;
+  const tc=correct.reduce((a,b)=>a+b,0),tw=wrong.reduce((a,b)=>a+b,0),tq=tc+tw;
+  const pct=tq>0?Math.round(tc/tq*100):0;
+  let wi=-1,wr=-1;
+  for(let i=0;i<5;i++){const t=correct[i]+wrong[i];if(t>=3){const r=wrong[i]/t;if(r>wr){wr=r;wi=i;}}}
+
+  document.getElementById('content').innerHTML=`
+    ${'<div class="demo-bar">🎮 גרסת דמו — נתונים לדוגמה בלבד</div>'}
+    <div class="cards-grid">
+      <div class="card cyan"><span class="card-icon">⏱️</span><div class="card-label">זמן באפליקציה</div><div class="card-val big">${fmtTime(d.totalTime||0)}</div><div class="card-sub">מצטבר</div></div>
+      <div class="card gold"><span class="card-icon">📺</span><div class="card-label">דקות מסך שנצברו</div><div class="card-val big">${d.totalMinutes||0}</div><div class="card-sub">דקות</div></div>
+      <div class="card green"><span class="card-icon">✅</span><div class="card-label">תשובות נכונות</div><div class="card-val big" style="color:${col(pct)}">${pct}%</div><div class="card-sub">${tc} מתוך ${tq} שאלות</div></div>
+      <div class="card red"><span class="card-icon">⚠️</span><div class="card-label">הכי קשה לאורי</div><div class="card-val small">${wi>=0?SEC_NAMES[wi]:'—'}</div><div class="card-sub">${wi>=0?Math.round(wr*100)+'% שגיאות':''}</div></div>
+    </div>
+    <div class="section-head">📊 ביצועים לפי נושא</div>
+    ${SEC_NAMES.map((name,i)=>{
+      const c=correct[i],w=wrong[i],t=c+w,p=t>0?Math.round(c/t*100):null,isW=i===wi;
+      return`<div class="topic${isW?' worst':''}">
+        <div class="topic-icon">${SEC_ICONS[i]}</div>
+        <div>
+          <div class="topic-name">${name}${isW?'<span class="worst-tag">קשה</span>':''}</div>
+          <div class="topic-bar-bg"><div class="topic-bar-fill" style="width:${p||0}%;background:${col(p)}"></div></div>
+        </div>
+        <div style="text-align:center">
+          <div class="topic-pct" style="color:${col(p)}">${p!==null?p+'%':'—'}</div>
+          <div class="topic-count">${c}/${t}</div>
+        </div>
+      </div>`;
+    }).join('')}`;
+
+  document.getElementById('resetBlock').innerHTML=`
+    <div class="reset-card">
+      <div class="reset-label">אורי צבר <span>${d.totalMinutes||0} דקות מסך</span> עד כה</div>
+      <button class="btn-reset" onclick="resetMinutes()">🔄 &nbsp;איפוס דקות מסך בלבד</button>
+      <button class="btn-reset" style="margin-top:10px;border-color:#FF8C00;color:#FF8C00;" onclick="resetAll()">⚠️ &nbsp;איפוס כל הנתונים</button>
+    </div>`;
+
+  document.getElementById('lastUpdate').textContent='עודכן: '+new Date().toLocaleTimeString('he-IL');
+}
+
+async function resetAll(){
+  alert('🎮 דמו — איפוס לא זמין בגרסה זו');
+}
+async function resetMinutes(){
+  alert('🎮 דמו — איפוס לא זמין בגרסה זו');
+}
+
+(async()=>{
+  document.getElementById('diffSlider').value=5;
+  updateKnob(5);
+  await renderStats();
+})();
+</script>
+</body>
+</html>
