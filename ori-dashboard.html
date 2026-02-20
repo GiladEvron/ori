@@ -166,7 +166,7 @@ async function saveDifficulty(){
   const v=parseInt(document.getElementById('diffSlider').value);
   try{
     await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/difficulty.json',{method:'PUT',body:JSON.stringify(v)});
-    const r=await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json');
+    const r=await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json?t='+Date.now());
     const d=r.ok&&await r.json()||{correct:[0,0,0,0,0],wrong:[0,0,0,0,0],screenMinutes:0,totalTime:0};
     d.difficulty=v;
     await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json',{method:'PUT',body:JSON.stringify(d)});
@@ -181,7 +181,7 @@ async function saveDifficulty(){
 async function renderStats(){
   let d,isDemo;
   try{
-    const r=await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json',{method:'GET',headers:{'Accept':'application/json'}});
+    const r=await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json?t='+Date.now(),{method:'GET',headers:{'Accept':'application/json'}});
     const raw=await r.json();
     if(raw && typeof raw==='object' && raw.wrong!==undefined){
       // Firebase converts arrays to objects - convert back
@@ -243,7 +243,7 @@ async function resetAll(){
 async function resetMinutes(){
   if(!confirm('לאפס את דקות המסך של אורי?'))return;
   try{
-    const r=await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json');
+    const r=await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json?t='+Date.now());
     if(r.ok){const d=await r.json();if(d){d.screenMinutes=0;d.totalMinutes=0;await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json',{method:'PUT',body:JSON.stringify(d)});}}
   }catch(e){}
   await renderStats();
