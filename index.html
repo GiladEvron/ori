@@ -713,15 +713,9 @@ function saveStats(){
 function trackScreen(min){stats.screenMinutes=(stats.screenMinutes||0)+min;}
 function trackCorrect(sec){
   stats.correct[sec]=(stats.correct[sec]||0)+1;
-  try{
-    fetch(FB+'/ori/stats/correct/'+sec+'.json',{method:'PUT',body:JSON.stringify(stats.correct[sec])});
-  }catch(e){}
 }
 function trackWrong(sec){
   stats.wrong[sec]=(stats.wrong[sec]||0)+1;
-  try{
-    fetch(FB+'/ori/stats/wrong/'+sec+'.json',{method:'PUT',body:JSON.stringify(stats.wrong[sec])});
-  }catch(e){}
 }
 function trackTime(){
   const mins=Math.round((Date.now()-stats.sessionStart)/60000);
@@ -741,6 +735,9 @@ setInterval(async()=>{
       const s=await r.json();
       if(s && s.totalMinutes!==undefined && s.totalMinutes!==totalScore){
         totalScore=s.totalMinutes;
+        // sync local stats too (catches resets)
+        if(s.correct && Array.isArray(s.correct)) stats.correct=s.correct;
+        if(s.wrong && Array.isArray(s.wrong)) stats.wrong=s.wrong;
         document.getElementById('scoreBox').textContent='📺 '+totalScore+' דק׳';
       }
     }
@@ -748,25 +745,28 @@ setInterval(async()=>{
 },5000);
 window.addEventListener('beforeunload',trackTime);
 
-async function addScore(min){
+function addScore(min){
   totalScore+=min;
   document.getElementById('scoreBox').textContent='📺 '+totalScore+' דק׳';
   const sb=document.getElementById('scoreBox');
   sb.style.boxShadow='0 0 22px rgba(255,214,0,.8)';
   setTimeout(()=>sb.style.boxShadow='0 0 10px rgba(255,214,0,.3)',600);
-  // increment in Firebase
-  try{
-    const r=await fetch(FB+'/ori/stats.json?t='+Date.now());
-    if(r.ok){
-      const s=await r.json()||{};
-      s.totalMinutes=(s.totalMinutes||0)+min;
-      s.screenMinutes=(s.screenMinutes||0)+min;
-      s.correct=s.correct||[0,0,0,0,0];
-      s.wrong=s.wrong||[0,0,0,0,0];
-      s.sessions=s.sessions||[];
-      await fetch(FB+'/ori/stats.json',{method:'PUT',body:JSON.stringify(s)});
-    }
-  }catch(e){}
+  // increment in Firebase (background)
+  (async()=>{
+    try{
+      const r=await fetch(FB+'/ori/stats.json?t='+Date.now());
+      if(r.ok){
+        const s=await r.json()||{};
+        s.totalMinutes=(s.totalMinutes||0)+min;
+        s.screenMinutes=(s.screenMinutes||0)+min;
+        // save correct/wrong from local stats
+        s.correct=stats.correct||[0,0,0,0,0];
+        s.wrong=stats.wrong||[0,0,0,0,0];
+        s.sessions=s.sessions||[];
+        await fetch(FB+'/ori/stats.json',{method:'PUT',body:JSON.stringify(s)});
+      }
+    }catch(e){}
+  })();
 }
 function incStreak(){
   bonusStreak++;
