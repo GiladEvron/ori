@@ -170,6 +170,14 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 
 /* ── FEEDBACK ── */
 .fb{margin-top:12px;padding:14px 16px;border-radius:10px;font-size:19px;font-weight:900;text-align:center;display:none;}
+.fb.ok,.fb.no,.fb.wn{display:block;}
+@media(max-width:600px){
+  .fb.ok,.fb.no,.fb.wn{
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    z-index:8000;width:90%;max-width:360px;
+    box-shadow:0 4px 24px rgba(0,0,0,.5);
+  }
+}
 .fb.ok{display:block;border:2px solid #00FF85;background:rgba(0,255,133,.1);color:#00FF85;box-shadow:0 0 20px rgba(0,255,133,.4);}
 .fb.no{display:block;border:2px solid #FF1F6E;background:rgba(255,31,110,.1);color:#FF1F6E;box-shadow:0 0 16px rgba(255,31,110,.4);}
 .fb.wn{display:block;border:2px solid #FFD600;background:rgba(255,214,0,.1);color:#FFD600;box-shadow:0 0 16px rgba(255,214,0,.4);}
@@ -669,7 +677,21 @@ function buildMCQ(id,correct,onPick,type){
   });
 }
 function lockMCQ(id){document.querySelectorAll('#'+id+' .mb').forEach(b=>{b.disabled=true;b.style.pointerEvents='none';});}
-function showFb(id,cls,msg,sub){const el=document.getElementById(id);el.className='fb '+cls;el.innerHTML=msg+(sub?`<div class="fb-sub">${sub}</div>`:'');}
+function showFb(id,cls,msg,sub){
+  // update inline element (for bonus etc)
+  const el=document.getElementById(id);
+  el.className='fb '+cls;
+  el.innerHTML=msg+(sub?`<div class="fb-sub">${sub}</div>`:'');
+  // show centered flash overlay
+  let ov=document.getElementById('fbOverlay');
+  if(!ov){ov=document.createElement('div');ov.id='fbOverlay';
+    ov.style.cssText='position:fixed;inset:0;z-index:8500;display:flex;align-items:center;justify-content:center;pointer-events:none;';
+    document.body.appendChild(ov);}
+  const bg=cls==='ok'?'#00FF85':cls==='no'?'#FF1F6E':'#FFD600';
+  const tc=cls==='ok'?'#07090F':cls==='no'?'#fff':'#07090F';
+  ov.innerHTML=`<div style="background:${bg};color:${tc};font-family:Heebo,sans-serif;font-weight:900;font-size:22px;padding:20px 36px;border-radius:16px;text-align:center;box-shadow:0 0 40px ${bg}99;animation:fadeUp .3s ease">${msg}${sub?`<div style="font-size:15px;opacity:.85;margin-top:6px">${sub}</div>`:''}</div>`;
+  clearTimeout(ov._t);ov._t=setTimeout(()=>{ov.innerHTML='';},1800);
+}
 
 // ── SCORING ──
 let totalScore=0;
@@ -811,7 +833,7 @@ function rotateRandom(fromSec){
   else if(next===4)genMissing();
   // flash notification
   const notif=document.createElement('div');
-  notif.style.cssText='position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;background:#FFD600;color:#07090F;font-family:Heebo,sans-serif;font-weight:900;font-size:18px;padding:12px 24px;border-radius:10px;box-shadow:0 0 20px rgba(255,214,0,.5)';
+  notif.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:#FFD600;color:#07090F;font-family:Heebo,sans-serif;font-weight:900;font-size:20px;padding:16px 32px;border-radius:14px;box-shadow:0 0 30px rgba(255,214,0,.7);text-align:center';
   notif.textContent='🔀 עוברים לנושא חדש!';
   document.body.appendChild(notif);
   setTimeout(()=>notif.remove(),2000);
