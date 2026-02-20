@@ -244,9 +244,9 @@ async function resetMinutes(){
   if(!confirm('לאפס את דקות המסך של אורי?'))return;
   try{
     const r=await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json');
-    if(r.ok){const d=await r.json();if(d){d.screenMinutes=0;await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json',{method:'PUT',body:JSON.stringify(d)});}}
+    if(r.ok){const d=await r.json();if(d){d.screenMinutes=0;d.totalMinutes=0;await fetch('https://ori-geo-default-rtdb.firebaseio.com/ori/stats.json',{method:'PUT',body:JSON.stringify(d)});}}
   }catch(e){}
-  renderStats();
+  await renderStats();
 }
 
 (async()=>{
