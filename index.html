@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
-<title>גיאומטריה עם אורי — דמו</title>
+<title>גיאומטריה עם אורי</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Heebo:wght@900&display=swap" rel="stylesheet"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -291,7 +291,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
     <div class="splash-title-block">
       <div class="splash-icon">📐</div>
       <div class="splash-heading">גיאומטריה עם אורי</div>
-      <div class="splash-subtitle">גרסת דמו 🎮</div>
+      <div class="splash-subtitle">הוראות למשחק</div>
     </div>
 
     <!-- topics -->
@@ -342,7 +342,6 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 <div class="wrap">
 
 <!-- HEADER -->
-<div style="background:rgba(255,214,0,.1);border:1.5px solid rgba(255,214,0,.4);border-radius:8px;padding:8px 14px;margin-bottom:12px;text-align:center;font-size:15px;font-weight:900;color:#FFD600;">🎮 גרסת דמו — הנתונים לא נשמרים</div>
 <div class="hbar">
   <div class="htitle">GEO · אורי</div>
   <div class="score-row">
@@ -562,6 +561,25 @@ function choices(correct,type){
 }
 const WINS=['אתה תותח! תשובה נכונה 🎯','מי הגאון של אבא? 🏆','תשובה נכונה יא מלך! 👑','אוריקי המלך! 🌟','וואו, פצצה! ✨'];
 
+// ── DIFFICULTY SYSTEM ──
+function getDiff(){return window._oriDifficulty||5;}
+function pickByDiff(pool){
+  const d=getDiff();
+  // build candidates: evaluate each factory, keep ones in difficulty range
+  const candidates=[];
+  for(let i=0;i<pool.length;i++){
+    const q=pool[i]();
+    const qd=q.d||5;
+    // allow questions from (d-2) to (d+1), clamped
+    if(qd>=Math.max(1,d-2)&&qd<=Math.min(10,d+1)) candidates.push(q);
+  }
+  if(candidates.length>0) return candidates[rnd(0,candidates.length-1)];
+  // fallback: pick closest difficulty
+  const all=pool.map(fn=>fn());
+  all.sort((a,b)=>Math.abs((a.d||5)-d)-Math.abs((b.d||5)-d));
+  return all[rnd(0,Math.min(4,all.length-1))];
+}
+
 // ── PARTICLES ──
 function boom(n){
   const C=['#00E5FF','#FF1F6E','#FFD600','#00FF85','#B94FFF','#FF8C00'];
@@ -696,16 +714,28 @@ let stats={
   wrong:   [0,0,0,0,0],   // per section
   sessions: []
 };
-// ══ DEMO MODE — no Firebase ══
+const FB='https://ori-geo-default-rtdb.firebaseio.com';
 async function loadStats(){
-  totalScore=0;
-  document.getElementById('scoreBox').textContent='📺 '+totalScore+' דק׳';
-  window._oriDifficulty=5;
+  try{
+    const r=await fetch(FB+'/ori/stats.json');
+    if(r.ok){const s=await r.json();
+      if(s){stats.totalMinutes=s.totalMinutes||0;stats.correct=s.correct||[0,0,0,0,0];stats.wrong=s.wrong||[0,0,0,0,0];stats.sessions=s.sessions||[];stats.screenMinutes=s.screenMinutes||0;}
+      totalScore=stats.totalMinutes;
+      document.getElementById('scoreBox').textContent='📺 '+totalScore+' דק׳';
+    }
+  }catch(e){}
+  try{
+    const r=await fetch(FB+'/ori/difficulty.json');
+    if(r.ok){const d=await r.json();if(d)window._oriDifficulty=parseInt(d)||5;}
+  }catch(e){}
 }
 let _saveTimer=null;
 function saveStats(){
   stats.totalMinutes=totalScore;
-  // demo — no Firebase save
+  clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(async()=>{
+    try{await fetch(FB+'/ori/stats.json',{method:'PUT',body:JSON.stringify(stats)});}catch(e){}
+  },1500);
 }
 function trackScreen(min){stats.screenMinutes=(stats.screenMinutes||0)+min;}
 function trackCorrect(sec){
@@ -724,7 +754,27 @@ function trackTime(){
 }
 // save session time every minute
 setInterval(()=>{trackTime();},60000);
-// demo — no Firebase polling
+// poll Firebase every 5 seconds - dashboard is the source of truth
+setInterval(async()=>{
+  try{
+    const r=await fetch(FB+'/ori/stats.json?t='+Date.now());
+    if(r.ok){
+      const s=await r.json();
+      if(s && s.totalMinutes!==undefined && s.totalMinutes!==totalScore){
+        totalScore=s.totalMinutes;
+        // sync local stats too (catches resets)
+        if(s.correct && Array.isArray(s.correct)) stats.correct=s.correct;
+        if(s.wrong && Array.isArray(s.wrong)) stats.wrong=s.wrong;
+        document.getElementById('scoreBox').textContent='📺 '+totalScore+' דק׳';
+      }
+    }
+  }catch(e){}
+  // poll difficulty too
+  try{
+    const rd=await fetch(FB+'/ori/difficulty.json?t='+Date.now());
+    if(rd.ok){const dv=await rd.json();if(dv)window._oriDifficulty=parseInt(dv)||5;}
+  }catch(e){}
+},5000);
 window.addEventListener('beforeunload',trackTime);
 
 function addScore(min){
@@ -733,7 +783,22 @@ function addScore(min){
   const sb=document.getElementById('scoreBox');
   sb.style.boxShadow='0 0 22px rgba(255,214,0,.8)';
   setTimeout(()=>sb.style.boxShadow='0 0 10px rgba(255,214,0,.3)',600);
-  // demo — no Firebase save
+  // increment in Firebase (background)
+  (async()=>{
+    try{
+      const r=await fetch(FB+'/ori/stats.json?t='+Date.now());
+      if(r.ok){
+        const s=await r.json()||{};
+        s.totalMinutes=(s.totalMinutes||0)+min;
+        s.screenMinutes=(s.screenMinutes||0)+min;
+        // save correct/wrong from local stats
+        s.correct=stats.correct||[0,0,0,0,0];
+        s.wrong=stats.wrong||[0,0,0,0,0];
+        s.sessions=s.sessions||[];
+        await fetch(FB+'/ori/stats.json',{method:'PUT',body:JSON.stringify(s)});
+      }
+    }catch(e){}
+  })();
 }
 function incStreak(){
   bonusStreak++;
@@ -833,23 +898,67 @@ function genRect(){
   const CY='#00E5FF',YE='#FFD600',GR='#00FF85',MA='#FF1F6E';
   const pool=[
     // עמ' 78 - שטח
-    ()=>({ans:21,shape:svgRect(7,3,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">7</b>, רוחב=<b style="color:${CY}">3</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
-    ()=>({ans:20,shape:svgRect(5,4,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">5</b>, רוחב=<b style="color:${CY}">4</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
-    ()=>({ans:9,shape:svgRect(3,3,GR,'area',false),type:'area',chip:'שטח = צלע × צלע',q:`ריבוע צלע=<b style="color:${GR}">3</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
-    ()=>({ans:12,shape:svgRect(3,4,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">4</b>, רוחב=<b style="color:${CY}">3</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:4,ans:21,shape:svgRect(7,3,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">7</b>, רוחב=<b style="color:${CY}">3</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:3,ans:20,shape:svgRect(5,4,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">5</b>, רוחב=<b style="color:${CY}">4</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:2,ans:9,shape:svgRect(3,3,GR,'area',false),type:'area',chip:'שטח = צלע × צלע',q:`ריבוע צלע=<b style="color:${GR}">3</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:3,ans:12,shape:svgRect(3,4,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">4</b>, רוחב=<b style="color:${CY}">3</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
     // עמ' 95 - היקף
-    ()=>({ans:12,shape:svgRect(4,2,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">4</b>, רוחב=<b style="color:${YE}">2</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
-    ()=>({ans:20,shape:svgRect(5,5,YE,'perim',false),type:'perim',chip:'היקף = 4 × צלע',q:`ריבוע צלע=<b style="color:${YE}">5</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
-    ()=>({ans:20,shape:svgRect(7,3,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">7</b>, רוחב=<b style="color:${YE}">3</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
-    ()=>({ans:14,shape:svgRect(6,1,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">6</b>, רוחב=<b style="color:${YE}">1</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
-    ()=>({ans:12,shape:svgRect(3,3,YE,'perim',false),type:'perim',chip:'היקף = 4 × צלע',q:`ריבוע צלע=<b style="color:${YE}">3</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
-    // שאלות ברמה דומה
-    ()=>{const a=rnd(4,12),b=rnd(2,7);return{ans:a*b,shape:svgRect(a,b,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">${a}</b>, רוחב=<b style="color:${CY}">${b}</b> — מה ה<b style="color:${MA}">שטח</b>?`};},
-    ()=>{const s=rnd(3,9);return{ans:s*s,shape:svgRect(s,s,GR,'area',false),type:'area',chip:'שטח = צלע × צלע',q:`ריבוע צלע=<b style="color:${GR}">${s}</b> — מה ה<b style="color:${MA}">שטח</b>?`};},
-    ()=>{const a=rnd(4,12),b=rnd(2,6);return{ans:2*(a+b),shape:svgRect(a,b,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">${a}</b>, רוחב=<b style="color:${YE}">${b}</b> — מה ה<b style="color:${MA}">היקף</b>?`};},
-    ()=>{const s=rnd(3,9);return{ans:4*s,shape:svgRect(s,s,YE,'perim',false),type:'perim',chip:'היקף = 4 × צלע',q:`ריבוע צלע=<b style="color:${YE}">${s}</b> — מה ה<b style="color:${MA}">היקף</b>?`};},
+    ()=>({d:2,ans:12,shape:svgRect(4,2,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">4</b>, רוחב=<b style="color:${YE}">2</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:3,ans:20,shape:svgRect(5,5,YE,'perim',false),type:'perim',chip:'היקף = 4 × צלע',q:`ריבוע צלע=<b style="color:${YE}">5</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:3,ans:20,shape:svgRect(7,3,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">7</b>, רוחב=<b style="color:${YE}">3</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:3,ans:14,shape:svgRect(6,1,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">6</b>, רוחב=<b style="color:${YE}">1</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:2,ans:12,shape:svgRect(3,3,YE,'perim',false),type:'perim',chip:'היקף = 4 × צלע',q:`ריבוע צלע=<b style="color:${YE}">3</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    // דפי עבודה — שטח
+    ()=>({d:5,ans:40,shape:svgRect(8,5,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">8</b>, רוחב=<b style="color:${CY}">5</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:6,ans:90,shape:svgRect(10,9,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">10</b>, רוחב=<b style="color:${CY}">9</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:3,ans:16,shape:svgRect(8,2,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">8</b>, רוחב=<b style="color:${CY}">2</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:2,ans:3,shape:svgRect(3,1,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">3</b>, רוחב=<b style="color:${CY}">1</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:9,ans:300,shape:svgRect(20,15,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">20</b>, רוחב=<b style="color:${CY}">15</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:4,ans:25,shape:svgRect(5,5,GR,'area',false),type:'area',chip:'שטח = צלע × צלע',q:`ריבוע צלע=<b style="color:${GR}">5</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:3,ans:16,shape:svgRect(4,4,GR,'area',false),type:'area',chip:'שטח = צלע × צלע',q:`ריבוע צלע=<b style="color:${GR}">4</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:4,ans:32,shape:svgRect(8,4,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">8</b>, רוחב=<b style="color:${CY}">4</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:3,ans:15,shape:svgRect(5,3,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">5</b>, רוחב=<b style="color:${CY}">3</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:6,ans:81,shape:svgRect(9,9,GR,'area',false),type:'area',chip:'שטח = צלע × צלע',q:`ריבוע צלע=<b style="color:${GR}">9</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:4,ans:24,shape:svgRect(6,4,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">6</b>, רוחב=<b style="color:${CY}">4</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:5,ans:49,shape:svgRect(7,7,GR,'area',false),type:'area',chip:'שטח = צלע × צלע',q:`ריבוע צלע=<b style="color:${GR}">7</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:6,ans:90,shape:svgRect(30,3,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">30</b>, רוחב=<b style="color:${CY}">3</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:5,ans:45,shape:svgRect(9,5,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">9</b>, רוחב=<b style="color:${CY}">5</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:5,ans:56,shape:svgRect(8,7,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">8</b>, רוחב=<b style="color:${CY}">7</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:4,ans:36,shape:svgRect(6,6,GR,'area',false),type:'area',chip:'שטח = צלע × צלע',q:`ריבוע צלע=<b style="color:${GR}">6</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:5,ans:64,shape:svgRect(8,8,GR,'area',false),type:'area',chip:'שטח = צלע × צלע',q:`ריבוע צלע=<b style="color:${GR}">8</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:6,ans:100,shape:svgRect(10,10,GR,'area',false),type:'area',chip:'שטח = צלע × צלע',q:`ריבוע צלע=<b style="color:${GR}">10</b> — מה ה<b style="color:${MA}">שטח</b>?`}),
+    // דפי עבודה — היקף
+    ()=>({d:4,ans:26,shape:svgRect(8,5,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">8</b>, רוחב=<b style="color:${YE}">5</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:5,ans:38,shape:svgRect(10,9,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">10</b>, רוחב=<b style="color:${YE}">9</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:3,ans:20,shape:svgRect(8,2,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">8</b>, רוחב=<b style="color:${YE}">2</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:2,ans:8,shape:svgRect(3,1,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">3</b>, רוחב=<b style="color:${YE}">1</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:8,ans:70,shape:svgRect(20,15,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">20</b>, רוחב=<b style="color:${YE}">15</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:3,ans:16,shape:svgRect(4,4,YE,'perim',false),type:'perim',chip:'היקף = 4 × צלע',q:`ריבוע צלע=<b style="color:${YE}">4</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:4,ans:24,shape:svgRect(8,4,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">8</b>, רוחב=<b style="color:${YE}">4</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:3,ans:16,shape:svgRect(5,3,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">5</b>, רוחב=<b style="color:${YE}">3</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:5,ans:36,shape:svgRect(9,9,YE,'perim',false),type:'perim',chip:'היקף = 4 × צלע',q:`ריבוע צלע=<b style="color:${YE}">9</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:3,ans:20,shape:svgRect(6,4,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">6</b>, רוחב=<b style="color:${YE}">4</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:4,ans:28,shape:svgRect(7,7,YE,'perim',false),type:'perim',chip:'היקף = 4 × צלע',q:`ריבוע צלע=<b style="color:${YE}">7</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:8,ans:66,shape:svgRect(30,3,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">30</b>, רוחב=<b style="color:${YE}">3</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:4,ans:28,shape:svgRect(9,5,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">9</b>, רוחב=<b style="color:${YE}">5</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:5,ans:30,shape:svgRect(8,7,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">8</b>, רוחב=<b style="color:${YE}">7</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:4,ans:24,shape:svgRect(6,6,YE,'perim',false),type:'perim',chip:'היקף = 4 × צלע',q:`ריבוע צלע=<b style="color:${YE}">6</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:5,ans:32,shape:svgRect(8,8,YE,'perim',false),type:'perim',chip:'היקף = 4 × צלע',q:`ריבוע צלע=<b style="color:${YE}">8</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:5,ans:40,shape:svgRect(10,10,YE,'perim',false),type:'perim',chip:'היקף = 4 × צלע',q:`ריבוע צלע=<b style="color:${YE}">10</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    // דפי עבודה — שאלות מילוליות
+    ()=>({d:8,ans:144,shape:svgRect(18,8,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">18</b>, רוחב קטן ב-10 מהאורך (<b style="color:${CY}">8</b>) — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:8,ans:52,shape:svgRect(18,8,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">18</b>, רוחב קטן ב-10 מהאורך (<b style="color:${YE}">8</b>) — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:9,ans:308,shape:svgRect(22,14,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">22</b>, רוחב קטן ב-8 מהאורך (<b style="color:${CY}">14</b>) — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:8,ans:72,shape:svgRect(22,14,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">22</b>, רוחב קטן ב-8 מהאורך (<b style="color:${YE}">14</b>) — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:9,ans:6300,shape:svgRect(70,90,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`חלון מלבני אורך=<b style="color:${CY}">70</b>, רוחב גדול ב-20 מהאורך (<b style="color:${CY}">90</b>) — מה ה<b style="color:${MA}">שטח</b>?`}),
+    ()=>({d:9,ans:320,shape:svgRect(70,90,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`חלון מלבני אורך=<b style="color:${YE}">70</b>, רוחב גדול ב-20 מהאורך (<b style="color:${YE}">90</b>) — מה ה<b style="color:${MA}">היקף</b>?`}),
+    // שאלות רנדומליות
+    ()=>{const a=rnd(4,12),b=rnd(2,7);return{d:5,ans:a*b,shape:svgRect(a,b,CY,'area',false),type:'area',chip:'שטח = אורך × רוחב',q:`מלבן אורך=<b style="color:${CY}">${a}</b>, רוחב=<b style="color:${CY}">${b}</b> — מה ה<b style="color:${MA}">שטח</b>?`};},
+    ()=>{const s=rnd(3,9);return{d:5,ans:s*s,shape:svgRect(s,s,GR,'area',false),type:'area',chip:'שטח = צלע × צלע',q:`ריבוע צלע=<b style="color:${GR}">${s}</b> — מה ה<b style="color:${MA}">שטח</b>?`};},
+    ()=>{const a=rnd(4,12),b=rnd(2,6);return{d:5,ans:2*(a+b),shape:svgRect(a,b,YE,'perim',false),type:'perim',chip:'היקף = 2×(אורך+רוחב)',q:`מלבן אורך=<b style="color:${YE}">${a}</b>, רוחב=<b style="color:${YE}">${b}</b> — מה ה<b style="color:${MA}">היקף</b>?`};},
+    ()=>{const s=rnd(3,9);return{d:4,ans:4*s,shape:svgRect(s,s,YE,'perim',false),type:'perim',chip:'היקף = 4 × צלע',q:`ריבוע צלע=<b style="color:${YE}">${s}</b> — מה ה<b style="color:${MA}">היקף</b>?`};},
   ];
-  const p=pool[rnd(0,pool.length-1)]();
+  const p=pickByDiff(pool);
   document.getElementById('sh0').innerHTML=p.shape;
   document.getElementById('fo0').innerHTML=`<div class="chip">${p.chip}</div>`;
   document.getElementById('qt0').innerHTML=p.q;
@@ -860,21 +969,27 @@ function genFrame(){
   const OR='#FF8C00',MA='#FF1F6E';
   const pool=[
     // עמ' 82 - חיבור
-    ()=>({ans:55+16,shape:svgTshape(11,5,4,4,OR),chip:'שטח = מלבן א + מלבן ב',q:`צורה מורכבת: <b style="color:${OR}">11×5</b> + <b style="color:${MA}">4×4</b> — מה ה<b style="color:${MA}">שטח הכולל</b>?`}),
-    ()=>({ans:33+6,shape:svgTshape(11,3,3,2,OR),chip:'שטח = מלבן א + מלבן ב',q:`צורה מורכבת: <b style="color:${OR}">11×3</b> + <b style="color:${MA}">3×2</b> — מה ה<b style="color:${MA}">שטח הכולל</b>?`}),
+    ()=>({d:6,ans:55+16,shape:svgTshape(11,5,4,4,OR),chip:'שטח = מלבן א + מלבן ב',q:`צורה מורכבת: <b style="color:${OR}">11×5</b> + <b style="color:${MA}">4×4</b> — מה ה<b style="color:${MA}">שטח הכולל</b>?`}),
+    ()=>({d:6,ans:33+6,shape:svgTshape(11,3,3,2,OR),chip:'שטח = מלבן א + מלבן ב',q:`צורה מורכבת: <b style="color:${OR}">11×3</b> + <b style="color:${MA}">3×2</b> — מה ה<b style="color:${MA}">שטח הכולל</b>?`}),
     // עמ' 80 - שני ריבועים
-    ()=>({ans:18,shape:svgTshape(3,3,3,3,OR),chip:'שטח = ריבוע א + ריבוע ב',q:`שני ריבועים <b style="color:${OR}">3×3</b> — מה ה<b style="color:${MA}">שטח הכולל</b>?`}),
-    ()=>({ans:25,shape:svgTshape(4,4,3,3,OR),chip:'שטח = ריבוע א + ריבוע ב',q:`ריבוע <b style="color:${OR}">4×4</b> + ריבוע <b style="color:${MA}">3×3</b> — מה ה<b style="color:${MA}">שטח הכולל</b>?`}),
-    ()=>({ans:24+15,shape:svgTshape(8,3,5,3,OR),chip:'שטח = מלבן א + מלבן ב',q:`מלבן <b style="color:${OR}">8×3</b> + מלבן <b style="color:${MA}">5×3</b> — מה ה<b style="color:${MA}">שטח הכולל</b>?`}),
+    ()=>({d:4,ans:18,shape:svgTshape(3,3,3,3,OR),chip:'שטח = ריבוע א + ריבוע ב',q:`שני ריבועים <b style="color:${OR}">3×3</b> — מה ה<b style="color:${MA}">שטח הכולל</b>?`}),
+    ()=>({d:6,ans:25,shape:svgTshape(4,4,3,3,OR),chip:'שטח = ריבוע א + ריבוע ב',q:`ריבוע <b style="color:${OR}">4×4</b> + ריבוע <b style="color:${MA}">3×3</b> — מה ה<b style="color:${MA}">שטח הכולל</b>?`}),
+    ()=>({d:6,ans:24+15,shape:svgTshape(8,3,5,3,OR),chip:'שטח = מלבן א + מלבן ב',q:`מלבן <b style="color:${OR}">8×3</b> + מלבן <b style="color:${MA}">5×3</b> — מה ה<b style="color:${MA}">שטח הכולל</b>?`}),
     // עמ' 81 - L-shape חיסור
-    ()=>({ans:5*7-2*2,shape:svgLshape(7,5,2,2,OR),chip:'שטח = מלבן גדול − פינה',q:`מלבן <b style="color:${OR}">7×5</b>, חתכנו פינה <b style="color:${MA}">2×2</b> — מה ה<b style="color:${MA}">שטח שנשאר</b>?`}),
-    ()=>({ans:8*4-3*3,shape:svgLshape(8,4,3,3,OR),chip:'שטח = מלבן גדול − פינה',q:`מלבן <b style="color:${OR}">8×4</b>, חתכנו פינה <b style="color:${MA}">3×3</b> — מה ה<b style="color:${MA}">שטח שנשאר</b>?`}),
-    ()=>({ans:6*4-2*3,shape:svgLshape(6,4,2,3,OR),chip:'שטח = מלבן גדול − פינה',q:`מלבן <b style="color:${OR}">6×4</b>, חתכנו פינה <b style="color:${MA}">2×3</b> — מה ה<b style="color:${MA}">שטח שנשאר</b>?`}),
-    // שאלות ברמה דומה
-    ()=>{const a1=rnd(5,11),b1=rnd(2,5),a2=rnd(2,5),b2=rnd(2,4);return{ans:a1*b1+a2*b2,shape:svgTshape(a1,b1,a2,b2,OR),chip:'שטח = מלבן א + מלבן ב',q:`צורה מורכבת: <b style="color:${OR}">${a1}×${b1}</b> + <b style="color:${MA}">${a2}×${b2}</b> — מה ה<b style="color:${MA}">שטח הכולל</b>?`};},
-    ()=>{const W=rnd(6,10),H=rnd(4,7),cw=rnd(2,W-2),ch=rnd(2,H-2);return{ans:W*H-cw*ch,shape:svgLshape(W,H,cw,ch,OR),chip:'שטח = מלבן גדול − פינה',q:`מלבן <b style="color:${OR}">${W}×${H}</b>, חתכנו פינה <b style="color:${MA}">${cw}×${ch}</b> — מה ה<b style="color:${MA}">שטח שנשאר</b>?`};},
+    ()=>({d:7,ans:5*7-2*2,shape:svgLshape(7,5,2,2,OR),chip:'שטח = מלבן גדול − פינה',q:`מלבן <b style="color:${OR}">7×5</b>, חתכנו פינה <b style="color:${MA}">2×2</b> — מה ה<b style="color:${MA}">שטח שנשאר</b>?`}),
+    ()=>({d:7,ans:8*4-3*3,shape:svgLshape(8,4,3,3,OR),chip:'שטח = מלבן גדול − פינה',q:`מלבן <b style="color:${OR}">8×4</b>, חתכנו פינה <b style="color:${MA}">3×3</b> — מה ה<b style="color:${MA}">שטח שנשאר</b>?`}),
+    ()=>({d:7,ans:6*4-2*3,shape:svgLshape(6,4,2,3,OR),chip:'שטח = מלבן גדול − פינה',q:`מלבן <b style="color:${OR}">6×4</b>, חתכנו פינה <b style="color:${MA}">2×3</b> — מה ה<b style="color:${MA}">שטח שנשאר</b>?`}),
+    // דפי עבודה — צורות מורכבות חדשות
+    ()=>({d:7,ans:8*7-6*4,shape:svgLshape(8,7,6,4,OR),chip:'שטח = מלבן גדול − פינה',q:`מלבן <b style="color:${OR}">8×7</b>, חתכנו פינה <b style="color:${MA}">6×4</b> — מה ה<b style="color:${MA}">שטח שנשאר</b>?`}),
+    ()=>({d:7,ans:8*8-6*3,shape:svgLshape(8,8,6,3,OR),chip:'שטח = מלבן גדול − פינה',q:`מלבן <b style="color:${OR}">8×8</b>, חתכנו פינה <b style="color:${MA}">6×3</b> — מה ה<b style="color:${MA}">שטח שנשאר</b>?`}),
+    ()=>({d:7,ans:10*5-4*3,shape:svgLshape(10,5,4,3,OR),chip:'שטח = מלבן גדול − פינה',q:`מלבן <b style="color:${OR}">10×5</b>, חתכנו פינה <b style="color:${MA}">4×3</b> — מה ה<b style="color:${MA}">שטח שנשאר</b>?`}),
+    ()=>({d:6,ans:6*3+9*3,shape:svgTshape(6,3,9,3,OR),chip:'שטח = מלבן א + מלבן ב',q:`מלבן <b style="color:${OR}">6×3</b> + מלבן <b style="color:${MA}">9×3</b> — מה ה<b style="color:${MA}">שטח הכולל</b>?`}),
+    ()=>({d:6,ans:5*10+3*3,shape:svgTshape(10,5,3,3,OR),chip:'שטח = מלבן א + מלבן ב',q:`מלבן <b style="color:${OR}">10×5</b> + ריבוע <b style="color:${MA}">3×3</b> — מה ה<b style="color:${MA}">שטח הכולל</b>?`}),
+    // שאלות רנדומליות
+    ()=>{const a1=rnd(5,11),b1=rnd(2,5),a2=rnd(2,5),b2=rnd(2,4);return{d:6,ans:a1*b1+a2*b2,shape:svgTshape(a1,b1,a2,b2,OR),chip:'שטח = מלבן א + מלבן ב',q:`צורה מורכבת: <b style="color:${OR}">${a1}×${b1}</b> + <b style="color:${MA}">${a2}×${b2}</b> — מה ה<b style="color:${MA}">שטח הכולל</b>?`};},
+    ()=>{const W=rnd(6,10),H=rnd(4,7),cw=rnd(2,W-2),ch=rnd(2,H-2);return{d:7,ans:W*H-cw*ch,shape:svgLshape(W,H,cw,ch,OR),chip:'שטח = מלבן גדול − פינה',q:`מלבן <b style="color:${OR}">${W}×${H}</b>, חתכנו פינה <b style="color:${MA}">${cw}×${ch}</b> — מה ה<b style="color:${MA}">שטח שנשאר</b>?`};},
   ];
-  const p=pool[rnd(0,pool.length-1)]();
+  const p=pickByDiff(pool);
   document.getElementById('sh1').innerHTML=p.shape;
   document.getElementById('fo1').innerHTML=`<div class="chip">${p.chip}</div>`;
   document.getElementById('qt1').innerHTML=p.q;
@@ -882,39 +997,82 @@ function genFrame(){
 }
 
 function genTri(){
-  const tp=rnd(0,2),GR='#00FF85',CY='#00E5FF',YE='#FFD600',MA='#FF1F6E';
-  let ans,shape,chip,q;
-  if(tp===0){const a=rnd(3,14),b=rnd(3,14),c=rnd(3,14);ans=a+b+c;shape=svgTri(a,b,c,GR,'perim',false);chip='P = א + ב + ג';q=`משולש, צלעות <b style="color:${GR}">${a}, ${b}, ${c}</b> — מה ה<b style="color:${MA}">היקף</b>?`;}
-  else if(tp===1){const leg=rnd(4,14),base=rnd(3,12);ans=leg*2+base;shape=svgTri(leg,leg,base,YE,'perim',false);chip='P = 2×שוק + בסיס';q=`שווה שוקיים, שוק=<b style="color:${YE}">${leg}</b>, בסיס=<b style="color:${YE}">${base}</b> — מה ה<b style="color:${MA}">היקף</b>?`;}
-  else{const a=rnd(3,12),b=rnd(3,12),P=rnd(a+b+4,a+b+18),c=P-a-b;ans=c;shape=svgTri(a,b,c,CY,'area',true);chip='ג = היקף − א − ב';q=`היקף=<b style="color:${CY}">${P}</b>, א=<b style="color:${CY}">${a}</b>, ב=<b style="color:${CY}">${b}</b> — מה <b style="color:${MA}">צלע ג</b>?`;}
-  document.getElementById('sh2').innerHTML=shape;
-  document.getElementById('fo2').innerHTML=`<div class="chip">${chip}</div>`;
-  document.getElementById('qt2').innerHTML=q;
-  buildMCQ('mc2',ans,(btn,v,c)=>pick(2,btn,v,c),'perim');
+  const GR='#00FF85',CY='#00E5FF',YE='#FFD600',MA='#FF1F6E';
+  const pool=[
+    // דפי עבודה — משולשים קבועים
+    ()=>({d:5,ans:30,shape:svgTri(5,12,13,GR,'perim',false),chip:'P = א + ב + ג',q:`משולש ישר-זווית, צלעות <b style="color:${GR}">5, 12, 13</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:7,ans:13,shape:svgTri(5,12,13,CY,'area',true),chip:'ג = היקף − א − ב',q:`היקף=<b style="color:${CY}">30</b>, א=<b style="color:${CY}">5</b>, ב=<b style="color:${CY}">12</b> — מה <b style="color:${MA}">צלע ג</b>?`}),
+    ()=>({d:4,ans:24,shape:svgTri(6,9,9,GR,'perim',false),chip:'P = א + ב + ג',q:`משולש שווה שוקיים, צלעות <b style="color:${GR}">6, 9, 9</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:3,ans:21,shape:svgTri(7,7,7,GR,'perim',false),chip:'P = 3 × צלע',q:`משולש שווה צלעות, צלע=<b style="color:${GR}">7</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:3,ans:24,shape:svgTri(8,8,8,GR,'perim',false),chip:'P = 3 × צלע',q:`משולש שווה צלעות, צלע=<b style="color:${GR}">8</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:3,ans:15,shape:svgTri(5,5,5,GR,'perim',false),chip:'P = 3 × צלע',q:`משולש שווה צלעות, צלע=<b style="color:${GR}">5</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:4,ans:18,shape:svgTri(4,6,8,GR,'perim',false),chip:'P = א + ב + ג',q:`משולש, צלעות <b style="color:${GR}">4, 6, 8</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:4,ans:22,shape:svgTri(5,8,9,GR,'perim',false),chip:'P = א + ב + ג',q:`משולש, צלעות <b style="color:${GR}">5, 8, 9</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:4,ans:20,shape:svgTri(3,8,9,GR,'perim',false),chip:'P = א + ב + ג',q:`משולש, צלעות <b style="color:${GR}">3, 8, 9</b> — מה ה<b style="color:${MA}">היקף</b>?`}),
+    ()=>({d:7,ans:8,shape:svgTri(5,7,8,CY,'area',true),chip:'ג = היקף − א − ב',q:`היקף=<b style="color:${CY}">20</b>, א=<b style="color:${CY}">5</b>, ב=<b style="color:${CY}">7</b> — מה <b style="color:${MA}">צלע ג</b>?`}),
+    ()=>({d:7,ans:6,shape:svgTri(4,6,10,CY,'area',true),chip:'ג = היקף − א − ב',q:`היקף=<b style="color:${CY}">20</b>, א=<b style="color:${CY}">4</b>, ב=<b style="color:${CY}">10</b> — מה <b style="color:${MA}">צלע ג</b>?`}),
+    ()=>({d:7,ans:9,shape:svgTri(5,9,9,CY,'area',true),chip:'ג = היקף − א − ב',q:`היקף=<b style="color:${CY}">23</b>, א=<b style="color:${CY}">5</b>, ב=<b style="color:${CY}">9</b> — מה <b style="color:${MA}">צלע ג</b>?`}),
+    // רנדומליים
+    ()=>{const a=rnd(3,14),b=rnd(3,14),c=rnd(3,14);return{d:5,ans:a+b+c,shape:svgTri(a,b,c,GR,'perim',false),chip:'P = א + ב + ג',q:`משולש, צלעות <b style="color:${GR}">${a}, ${b}, ${c}</b> — מה ה<b style="color:${MA}">היקף</b>?`};},
+    ()=>{const leg=rnd(4,14),base=rnd(3,12);return{d:5,ans:leg*2+base,shape:svgTri(leg,leg,base,YE,'perim',false),chip:'P = 2×שוק + בסיס',q:`שווה שוקיים, שוק=<b style="color:${YE}">${leg}</b>, בסיס=<b style="color:${YE}">${base}</b> — מה ה<b style="color:${MA}">היקף</b>?`};},
+    ()=>{const a=rnd(3,12),b=rnd(3,12),P=rnd(a+b+4,a+b+18),c=P-a-b;return{d:7,ans:c,shape:svgTri(a,b,c,CY,'area',true),chip:'ג = היקף − א − ב',q:`היקף=<b style="color:${CY}">${P}</b>, א=<b style="color:${CY}">${a}</b>, ב=<b style="color:${CY}">${b}</b> — מה <b style="color:${MA}">צלע ג</b>?`};},
+  ];
+  const p=pickByDiff(pool);
+  document.getElementById('sh2').innerHTML=p.shape;
+  document.getElementById('fo2').innerHTML=`<div class="chip">${p.chip}</div>`;
+  document.getElementById('qt2').innerHTML=p.q;
+  buildMCQ('mc2',p.ans,(btn,v,c)=>pick(2,btn,v,c),'perim');
 }
 
 function genMissing(){
   const MA='#FF1F6E';
   const pool=[
     // עמ' 83 - שטח נתון
-    ()=>({ans:4, shape:svgRect(16,4,MA,'area',true),chip:'רוחב = שטח ÷ אורך',q:`שטח=<b style="color:${MA}">64 סמ"ר</b>, אורך=<b style="color:${MA}">16</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
-    ()=>({ans:2, shape:svgRect(12,2,MA,'area',true),chip:'רוחב = שטח ÷ אורך',q:`שטח=<b style="color:${MA}">24 סמ"ר</b>, אורך=<b style="color:${MA}">12</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
-    ()=>({ans:6, shape:svgRect(6,6,MA,'area',true),chip:'צלע = √שטח',q:`ריבוע, שטח=<b style="color:${MA}">36 סמ"ר</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
-    ()=>({ans:4, shape:svgRect(7,4,MA,'area',true),chip:'רוחב = שטח ÷ אורך',q:`שטח=<b style="color:${MA}">28 סמ"ר</b>, אורך=<b style="color:${MA}">7</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
-    ()=>({ans:6, shape:svgRect(8,6,MA,'area',true),chip:'רוחב = שטח ÷ אורך',q:`שטח=<b style="color:${MA}">48 סמ"ר</b>, אורך=<b style="color:${MA}">8</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
-    ()=>({ans:3, shape:svgRect(3,3,MA,'area',true),chip:'צלע = √שטח',q:`ריבוע, שטח=<b style="color:${MA}">9 סמ"ר</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
+    ()=>({d:6,ans:4, shape:svgRect(16,4,MA,'area',true),chip:'רוחב = שטח ÷ אורך',q:`שטח=<b style="color:${MA}">64 סמ"ר</b>, אורך=<b style="color:${MA}">16</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({d:5,ans:2, shape:svgRect(12,2,MA,'area',true),chip:'רוחב = שטח ÷ אורך',q:`שטח=<b style="color:${MA}">24 סמ"ר</b>, אורך=<b style="color:${MA}">12</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({d:6,ans:6, shape:svgRect(6,6,MA,'area',true),chip:'צלע = √שטח',q:`ריבוע, שטח=<b style="color:${MA}">36 סמ"ר</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
+    ()=>({d:6,ans:4, shape:svgRect(7,4,MA,'area',true),chip:'רוחב = שטח ÷ אורך',q:`שטח=<b style="color:${MA}">28 סמ"ר</b>, אורך=<b style="color:${MA}">7</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({d:6,ans:6, shape:svgRect(8,6,MA,'area',true),chip:'רוחב = שטח ÷ אורך',q:`שטח=<b style="color:${MA}">48 סמ"ר</b>, אורך=<b style="color:${MA}">8</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({d:5,ans:3, shape:svgRect(3,3,MA,'area',true),chip:'צלע = √שטח',q:`ריבוע, שטח=<b style="color:${MA}">9 סמ"ר</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
     // עמ' 98 - היקף נתון
-    ()=>({ans:9, shape:svgRect(9,9,MA,'perim',true),chip:'צלע = היקף ÷ 4',q:`ריבוע, היקף=<b style="color:${MA}">36 סמ"מ</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
-    ()=>({ans:4, shape:svgRect(16,4,MA,'perim',true),chip:'רוחב = (היקף÷2) − אורך',q:`היקף=<b style="color:${MA}">40 סמ"מ</b>, אורך=<b style="color:${MA}">16</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
-    ()=>({ans:12,shape:svgRect(2,12,MA,'perim',true),chip:'רוחב = (היקף÷2) − אורך',q:`היקף=<b style="color:${MA}">28 סמ"מ</b>, אורך=<b style="color:${MA}">2</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
-    ()=>({ans:7, shape:svgRect(7,7,MA,'perim',true),chip:'צלע = היקף ÷ 4',q:`ריבוע, היקף=<b style="color:${MA}">28 סמ"מ</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
-    // שאלות ברמה דומה
-    ()=>{const a=rnd(4,12),b=rnd(2,7);return{ans:b,shape:svgRect(a,b,MA,'area',true),chip:'רוחב = שטח ÷ אורך',q:`שטח=<b style="color:${MA}">${a*b} סמ"ר</b>, אורך=<b style="color:${MA}">${a}</b> — מה ה<b style="color:${MA}">רוחב</b>?`};},
-    ()=>{const s=[3,4,5,6,7,8,9][rnd(0,6)];return{ans:s,shape:svgRect(s,s,MA,'area',true),chip:'צלע = √שטח',q:`ריבוע, שטח=<b style="color:${MA}">${s*s} סמ"ר</b> — מה ה<b style="color:${MA}">צלע</b>?`};},
-    ()=>{const a=rnd(4,12),b=rnd(2,6);return{ans:b,shape:svgRect(a,b,MA,'perim',true),chip:'רוחב = (היקף÷2) − אורך',q:`היקף=<b style="color:${MA}">${2*(a+b)} סמ"מ</b>, אורך=<b style="color:${MA}">${a}</b> — מה ה<b style="color:${MA}">רוחב</b>?`};},
-    ()=>{const s=rnd(3,10);return{ans:s,shape:svgRect(s,s,MA,'perim',true),chip:'צלע = היקף ÷ 4',q:`ריבוע, היקף=<b style="color:${MA}">${4*s} סמ"מ</b> — מה ה<b style="color:${MA}">צלע</b>?`};},
+    ()=>({d:7,ans:9, shape:svgRect(9,9,MA,'perim',true),chip:'צלע = היקף ÷ 4',q:`ריבוע, היקף=<b style="color:${MA}">36 סמ"מ</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
+    ()=>({d:6,ans:4, shape:svgRect(16,4,MA,'perim',true),chip:'רוחב = (היקף÷2) − אורך',q:`היקף=<b style="color:${MA}">40 סמ"מ</b>, אורך=<b style="color:${MA}">16</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({d:8,ans:12,shape:svgRect(2,12,MA,'perim',true),chip:'רוחב = (היקף÷2) − אורך',q:`היקף=<b style="color:${MA}">28 סמ"מ</b>, אורך=<b style="color:${MA}">2</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({d:7,ans:7, shape:svgRect(7,7,MA,'perim',true),chip:'צלע = היקף ÷ 4',q:`ריבוע, היקף=<b style="color:${MA}">28 סמ"מ</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
+    // דפי עבודה — שטח נתון
+    ()=>({d:5,ans:5, shape:svgRect(5,5,MA,'area',true),chip:'צלע = √שטח',q:`ריבוע, שטח=<b style="color:${MA}">25 סמ"ר</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
+    ()=>({d:6,ans:4, shape:svgRect(8,4,MA,'area',true),chip:'רוחב = שטח ÷ אורך',q:`שטח=<b style="color:${MA}">32 סמ"ר</b>, אורך=<b style="color:${MA}">8</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({d:7,ans:10,shape:svgRect(10,10,MA,'area',true),chip:'צלע = √שטח',q:`ריבוע, שטח=<b style="color:${MA}">100 סמ"ר</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
+    ()=>({d:5,ans:2, shape:svgRect(10,2,MA,'area',true),chip:'רוחב = שטח ÷ אורך',q:`שטח=<b style="color:${MA}">20 סמ"ר</b>, אורך=<b style="color:${MA}">10</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({d:5,ans:3, shape:svgRect(9,3,MA,'area',true),chip:'רוחב = שטח ÷ אורך',q:`שטח=<b style="color:${MA}">27 סמ"ר</b>, אורך=<b style="color:${MA}">9</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({d:7,ans:8, shape:svgRect(8,3,MA,'area',true),chip:'אורך = שטח ÷ רוחב',q:`שטח=<b style="color:${MA}">24 סמ"ר</b>, רוחב=<b style="color:${MA}">3</b> — מה ה<b style="color:${MA}">אורך</b>?`}),
+    ()=>({d:5,ans:2, shape:svgRect(7,2,MA,'area',true),chip:'רוחב = שטח ÷ אורך',q:`שטח=<b style="color:${MA}">14 סמ"ר</b>, אורך=<b style="color:${MA}">7</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({d:6,ans:4, shape:svgRect(5,4,MA,'area',true),chip:'רוחב = שטח ÷ אורך',q:`שטח=<b style="color:${MA}">20 סמ"ר</b>, אורך=<b style="color:${MA}">5</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({d:5,ans:3, shape:svgRect(5,3,MA,'area',true),chip:'רוחב = שטח ÷ אורך',q:`שטח=<b style="color:${MA}">15 סמ"ר</b>, אורך=<b style="color:${MA}">5</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({d:6,ans:4, shape:svgRect(3,4,MA,'area',true),chip:'אורך = שטח ÷ רוחב',q:`שטח=<b style="color:${MA}">12 סמ"ר</b>, רוחב=<b style="color:${MA}">3</b> — מה ה<b style="color:${MA}">אורך</b>?`}),
+    ()=>({d:6,ans:6, shape:svgRect(4,6,MA,'area',true),chip:'אורך = שטח ÷ רוחב',q:`שטח=<b style="color:${MA}">24 סמ"ר</b>, רוחב=<b style="color:${MA}">4</b> — מה ה<b style="color:${MA}">אורך</b>?`}),
+    ()=>({d:7,ans:12,shape:svgRect(2,12,MA,'area',true),chip:'אורך = שטח ÷ רוחב',q:`שטח=<b style="color:${MA}">24 סמ"ר</b>, רוחב=<b style="color:${MA}">2</b> — מה ה<b style="color:${MA}">אורך</b>?`}),
+    ()=>({d:6,ans:7, shape:svgRect(7,7,MA,'area',true),chip:'צלע = √שטח',q:`ריבוע, שטח=<b style="color:${MA}">49 סמ"ר</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
+    ()=>({d:7,ans:9, shape:svgRect(9,9,MA,'area',true),chip:'צלע = √שטח',q:`ריבוע, שטח=<b style="color:${MA}">81 סמ"ר</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
+    ()=>({d:6,ans:8, shape:svgRect(8,8,MA,'area',true),chip:'צלע = √שטח',q:`ריבוע, שטח=<b style="color:${MA}">64 סמ"ר</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
+    // דפי עבודה — היקף נתון
+    ()=>({d:6,ans:3, shape:svgRect(3,3,MA,'perim',true),chip:'צלע = היקף ÷ 4',q:`ריבוע, היקף=<b style="color:${MA}">12 סמ"מ</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
+    ()=>({d:7,ans:10,shape:svgRect(10,10,MA,'perim',true),chip:'צלע = היקף ÷ 4',q:`ריבוע, היקף=<b style="color:${MA}">40 סמ"מ</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
+    ()=>({d:6,ans:5, shape:svgRect(5,5,MA,'perim',true),chip:'צלע = היקף ÷ 4',q:`ריבוע, היקף=<b style="color:${MA}">20 סמ"מ</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
+    ()=>({d:7,ans:6, shape:svgRect(6,6,MA,'perim',true),chip:'צלע = היקף ÷ 4',q:`ריבוע, היקף=<b style="color:${MA}">24 סמ"מ</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
+    ()=>({d:7,ans:8, shape:svgRect(8,8,MA,'perim',true),chip:'צלע = היקף ÷ 4',q:`ריבוע, היקף=<b style="color:${MA}">32 סמ"מ</b> — מה ה<b style="color:${MA}">צלע</b>?`}),
+    ()=>({d:6,ans:5, shape:svgRect(8,5,MA,'perim',true),chip:'רוחב = (היקף÷2) − אורך',q:`היקף=<b style="color:${MA}">26 סמ"מ</b>, אורך=<b style="color:${MA}">8</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({d:6,ans:1, shape:svgRect(9,1,MA,'perim',true),chip:'רוחב = (היקף÷2) − אורך',q:`היקף=<b style="color:${MA}">20 סמ"מ</b>, אורך=<b style="color:${MA}">9</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({d:6,ans:2, shape:svgRect(9,2,MA,'perim',true),chip:'רוחב = (היקף÷2) − אורך',q:`היקף=<b style="color:${MA}">22 סמ"מ</b>, אורך=<b style="color:${MA}">9</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({d:6,ans:3, shape:svgRect(8,3,MA,'perim',true),chip:'רוחב = (היקף÷2) − אורך',q:`היקף=<b style="color:${MA}">22 סמ"מ</b>, אורך=<b style="color:${MA}">8</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    ()=>({d:8,ans:15,shape:svgRect(20,15,MA,'perim',true),chip:'רוחב = (היקף÷2) − אורך',q:`היקף=<b style="color:${MA}">70 סמ"מ</b>, אורך=<b style="color:${MA}">20</b> — מה ה<b style="color:${MA}">רוחב</b>?`}),
+    // שאלות רנדומליות
+    ()=>{const a=rnd(4,12),b=rnd(2,7);return{d:6,ans:b,shape:svgRect(a,b,MA,'area',true),chip:'רוחב = שטח ÷ אורך',q:`שטח=<b style="color:${MA}">${a*b} סמ"ר</b>, אורך=<b style="color:${MA}">${a}</b> — מה ה<b style="color:${MA}">רוחב</b>?`};},
+    ()=>{const s=[3,4,5,6,7,8,9,10][rnd(0,7)];return{d:6,ans:s,shape:svgRect(s,s,MA,'area',true),chip:'צלע = √שטח',q:`ריבוע, שטח=<b style="color:${MA}">${s*s} סמ"ר</b> — מה ה<b style="color:${MA}">צלע</b>?`};},
+    ()=>{const a=rnd(4,12),b=rnd(2,6);return{d:7,ans:b,shape:svgRect(a,b,MA,'perim',true),chip:'רוחב = (היקף÷2) − אורך',q:`היקף=<b style="color:${MA}">${2*(a+b)} סמ"מ</b>, אורך=<b style="color:${MA}">${a}</b> — מה ה<b style="color:${MA}">רוחב</b>?`};},
+    ()=>{const s=rnd(3,10);return{d:7,ans:s,shape:svgRect(s,s,MA,'perim',true),chip:'צלע = היקף ÷ 4',q:`ריבוע, היקף=<b style="color:${MA}">${4*s} סמ"מ</b> — מה ה<b style="color:${MA}">צלע</b>?`};},
   ];
-  const p=pool[rnd(0,pool.length-1)]();
+  const p=pickByDiff(pool);
   document.getElementById('sh4').innerHTML=p.shape;
   document.getElementById('fo4').innerHTML=`<div class="chip">${p.chip}</div>`;
   document.getElementById('qt4').innerHTML=p.q;
@@ -925,11 +1083,35 @@ function genMissing(){
 let dctx=null,dtool='rect',dstart=null,drawing=false,userShape=null,dtarget=null;
 const GS=29,GC=10,GR2=10;
 const DRAWS=[
-  {txt:'צייר מלבן 5×3',shape:'rect',w:5,h:3},{txt:'צייר ריבוע 4×4',shape:'sq',s:4},
-  {txt:'צייר מלבן 6×2',shape:'rect',w:6,h:2},{txt:'צייר ריבוע 3×3',shape:'sq',s:3},
-  {txt:'צייר מלבן 4×5',shape:'rect',w:4,h:5},{txt:'צייר ריבוע 5×5',shape:'sq',s:5},
-  {txt:'צייר מלבן 7×3',shape:'rect',w:7,h:3},{txt:'צייר ריבוע 6×6',shape:'sq',s:6},
-  {txt:'צייר מלבן 8×2',shape:'rect',w:8,h:2},{txt:'צייר מלבן 3×7',shape:'rect',w:3,h:7},
+  {d:3,txt:'צייר מלבן 5×3',shape:'rect',w:5,h:3},{d:3,txt:'צייר ריבוע 4×4',shape:'sq',s:4},
+  {d:3,txt:'צייר מלבן 6×2',shape:'rect',w:6,h:2},{d:2,txt:'צייר ריבוע 3×3',shape:'sq',s:3},
+  {d:3,txt:'צייר מלבן 4×5',shape:'rect',w:4,h:5},{d:3,txt:'צייר ריבוע 5×5',shape:'sq',s:5},
+  {d:4,txt:'צייר מלבן 7×3',shape:'rect',w:7,h:3},{d:4,txt:'צייר ריבוע 6×6',shape:'sq',s:6},
+  {d:4,txt:'צייר מלבן 8×2',shape:'rect',w:8,h:2},{d:4,txt:'צייר מלבן 3×7',shape:'rect',w:3,h:7},
+  // דפי עבודה — שרטוט לפי מידות
+  {d:4,txt:'צייר מלבן 8×4',shape:'rect',w:8,h:4},{d:5,txt:'צייר ריבוע 7×7',shape:'sq',s:7},{d:5,txt:'צייר מלבן 9×2',shape:'rect',w:9,h:2},
+  // דפי עבודה — שרטוט לפי שטח
+  {d:6,txt:'צייר מלבן ששטחו 12 סמ"ר',shape:'area',area:12},
+  {d:8,txt:'צייר מלבן ששטחו 24 סמ"ר',shape:'area',area:24},
+  {d:7,txt:'צייר מלבן ששטחו 18 סמ"ר',shape:'area',area:18},
+  {d:7,txt:'צייר מלבן ששטחו 20 סמ"ר',shape:'area',area:20},
+  {d:5,txt:'צייר מלבן ששטחו 8 סמ"ר',shape:'area',area:8},
+  {d:6,txt:'צייר מלבן ששטחו 15 סמ"ר',shape:'area',area:15},
+  {d:5,txt:'צייר מלבן ששטחו 6 סמ"ר',shape:'area',area:6},
+  {d:6,txt:'צייר מלבן ששטחו 10 סמ"ר',shape:'area',area:10},
+  {d:7,txt:'צייר מלבן ששטחו 16 סמ"ר',shape:'area',area:16},
+  {d:5,txt:'צייר מלבן ששטחו 9 סמ"ר',shape:'area',area:9},
+  {d:8,txt:'צייר מלבן ששטחו 30 סמ"ר',shape:'area',area:30},
+  {d:9,txt:'צייר מלבן ששטחו 36 סמ"ר',shape:'area',area:36},
+  // דפי עבודה — שרטוט לפי היקף
+  {d:7,txt:'צייר מלבן שהיקפו 20 סמ"מ',shape:'perim',perim:20},
+  {d:7,txt:'צייר מלבן שהיקפו 18 סמ"מ',shape:'perim',perim:18},
+  {d:8,txt:'צייר מלבן שהיקפו 24 סמ"מ',shape:'perim',perim:24},
+  {d:8,txt:'צייר מלבן שהיקפו 22 סמ"מ',shape:'perim',perim:22},
+  {d:7,txt:'צייר מלבן שהיקפו 16 סמ"מ',shape:'perim',perim:16},
+  {d:6,txt:'צייר מלבן שהיקפו 12 סמ"מ',shape:'perim',perim:12},
+  {d:9,txt:'צייר מלבן שהיקפו 28 סמ"מ',shape:'perim',perim:28},
+  {d:6,txt:'צייר מלבן שהיקפו 14 סמ"מ',shape:'perim',perim:14},
 ];
 
 function initDraw(){
@@ -1008,7 +1190,9 @@ function finalize(a,b){
 function clrDraw(){userShape=null;drawGrid();}
 function setTool(t){dtool=t;document.getElementById('tb1').className='tbtn'+(t==='rect'?' on':'');document.getElementById('tb2').className='tbtn'+(t==='sq'?' on':'');}
 function newDraw(){
-  dtarget=DRAWS[rnd(0,DRAWS.length-1)];
+  const d=getDiff();
+  const candidates=DRAWS.filter(t=>{const td=t.d||5;return td>=Math.max(1,d-2)&&td<=Math.min(10,d+1);});
+  dtarget=(candidates.length>0?candidates:DRAWS)[rnd(0,(candidates.length>0?candidates:DRAWS).length-1)];
   document.getElementById('dt').textContent='🎯 משימה: '+dtarget.txt;
   document.getElementById('fb3').className='fb';
   document.getElementById('nx3').style.display='none';
@@ -1018,17 +1202,26 @@ function chkDraw(){
   const fb=document.getElementById('fb3');
   if(!userShape||userShape.x2<=userShape.x1||userShape.y2<=userShape.y1){fb.className='fb wn';fb.innerHTML='⚠️ קודם צייר צורה על הרשת!';return;}
   const dw=userShape.x2-userShape.x1,dh=userShape.y2-userShape.y1,t=dtarget;
-  const ok=(t.shape==='rect'&&((dw===t.w&&dh===t.h)||(dw===t.h&&dh===t.w)))||(t.shape==='sq'&&dw===dh&&dw===t.s);
+  let ok=false,area=dw*dh,perim=2*(dw+dh);
+  if(t.shape==='rect') ok=(dw===t.w&&dh===t.h)||(dw===t.h&&dh===t.w);
+  else if(t.shape==='sq') ok=dw===dh&&dw===t.s;
+  else if(t.shape==='area') ok=area===t.area&&dw>0&&dh>0;
+  else if(t.shape==='perim') ok=perim===t.perim&&dw>0&&dh>0;
   if(ok){
     boom(80);
-    const area=(t.shape==='sq'?t.s*t.s:t.w*t.h);
     fb.className='fb ok';
     fb.innerHTML=WINS[rnd(0,WINS.length-1)]+'<div class="fb-sub">שרטוט מושלם! +1 דקת מסך 📺</div>'
-      +`<div class="area-q">📐 מה השטח של מה שסרטת? <b style="color:#FFD600">${area} סמ"ר</b></div>`;
+      +`<div class="area-q">📐 ${dw}×${dh} — שטח=<b style="color:#FFD600">${area} סמ"ר</b>, היקף=<b style="color:#00E5FF">${perim} סמ"מ</b></div>`;
     addScore(1);incStreak();addSecProgress(3);trackCorrect(3);
     setTimeout(()=>nextQuestion(3),2000);
   } else {
-    trackWrong(3);fb.className='fb no';fb.innerHTML='לא מדויק 💪<div class="fb-sub">נדרש: '+(t.shape==='sq'?'ריבוע '+t.s+'×'+t.s:'מלבן '+t.w+'×'+t.h)+'</div>';
+    trackWrong(3);fb.className='fb no';
+    let hint='';
+    if(t.shape==='sq') hint='נדרש: ריבוע '+t.s+'×'+t.s;
+    else if(t.shape==='rect') hint='נדרש: מלבן '+t.w+'×'+t.h;
+    else if(t.shape==='area') hint='נדרש: שטח '+t.area+' סמ"ר (ציירת '+dw+'×'+dh+'='+area+' סמ"ר)';
+    else if(t.shape==='perim') hint='נדרש: היקף '+t.perim+' סמ"מ (ציירת '+dw+'×'+dh+', היקף='+perim+' סמ"מ)';
+    fb.innerHTML='לא מדויק 💪<div class="fb-sub">'+hint+'</div>';
     setTimeout(()=>newDraw(),2000);
   }
 }
